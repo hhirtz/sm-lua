@@ -1,58 +1,87 @@
-xemu = require("cross emu")
+local xemu = require("cross emu")
 
-function makeReader(p, n, is_signed, interval, is_aram)
-    -- p: Pointer to WRAM (or ARAM)
-    -- n: Number of bytes to read
+-- map of [domain] -> [byte size] -> [signed=true/unsigned=false] -> function(addr)
+local _mainread_u8 = mainmemory.read_u8
+local _mainread_s8 = mainmemory.read_s8
+local _mainread_u16_le = mainmemory.read_u16_le
+local _mainread_s16_le = mainmemory.read_s16_le
+local _read_u8 = memory.read_u8
+local _read_s8 = memory.read_s8
+local _read_u16_le = memory.read_u16_le
+local _read_s16_le = memory.read_s16_le
+local _readers = {
+    WRAM = {
+        [1] = {
+            [false] = _mainread_u8,
+            [true] = _mainread_s8,
+        },
+        [2] = {
+            [false] = _mainread_u16_le,
+            [true] = _mainread_s16_le,
+        },
+    },
+    APURAM = {
+        [1] = {
+            [false] = function(addr) return _read_u8(addr, "APURAM") end,
+            [true] = function(addr) return _read_s8(addr, "APURAM") end,
+        },
+        [2] = {
+            [false] = function(addr) return _read_u16_le(addr, "APURAM") end,
+            [true] = function(addr) return _read_s16_le(addr, "APURAM") end,
+        },
+    },
+    CARTROM = {
+        [1] = {
+            [false] = function(addr) return _read_u8(addr, "CARTROM") end,
+            [true] = function(addr) return _read_s8(addr, "CARTROM") end,
+        },
+        [2] = {
+            [false] = function(addr) return _read_u16_le(addr, "CARTROM") end,
+            [true] = function(addr) return _read_s16_le(addr, "CARTROM") end,
+        },
+    },
+}
+
+local function makeReader(address, byte_size, is_signed, interval, domain)
+    -- address: Pointer to WRAM (or ARAM)
+    -- byte_size: Number of bytes to read
     -- is_signed: Whether or not to sign extend read values
     -- interval: If specified, size of array entries, where p is the address within the first array entry
     --           Returned reader will have an array index parameter
-    -- is_aram: Whether or not to read from ARAM
+    -- domain: memory domain
 
-    if n < 1 or n > 2 then
-        error(string.format('Trying to make reader with n = %d', n))
+    if domain == nil then
+        if address < 0x800000 then
+            domain = 'WRAM'
+            address = address & 0x1FFFF
+        else
+            domain = 'CARTROM'
+            address = ((address >> 1) & 0x3F8000) + (address & 0x7FFF)
+        end
     end
 
-    local unsignedReaders = {
-        [1] = xemu.read_u8,
-        [2] = xemu.read_u16_le
-    }
-    local signedReaders = {
-        [1] = xemu.read_s8,
-        [2] = xemu.read_s16_le
-    }
-
-    if is_aram then
-        unsignedReaders = {
-            [1] = xemu.read_aram_u8,
-            [2] = xemu.read_aram_u16_le
-        }
-        signedReaders = {
-            [1] = xemu.read_aram_s8,
-            [2] = xemu.read_aram_s16_le
-        }
-    end
-
-    local reader = unsignedReaders[n] or function() return 0 end
-    if is_signed then
-        reader = signedReaders[n] or function() return 0 end
-    end
+    local reader = _readers[domain or 'WRAM']
+    assert(reader, 'invalid memory domain')
+    reader = reader[byte_size]
+    assert(reader, 'invalid byte size')
+    reader = reader[is_signed or false]
 
     if interval then
-        return function(i) return reader(p + i * interval) end
+        return function(i) return reader(address + i * interval) end
     else
-        return function() return reader(p) end
+        return function() return reader(address) end
     end
 end
 
-function makeAramReader(p, n, is_signed, interval)
-    return makeReader(p, n, is_signed, interval, true)
+local function makeAramReader(p, n, is_signed, interval)
+    return makeReader(p, n, is_signed, interval, 'APURAM')
 end
 
-function makeAggregateReader(readers)
+local function makeAggregateReader(readers)
     return function(i) return readers[i + 1] end
 end
 
-function makeWriter(p, n, interval)
+local function makeWriter(p, n, interval)
     -- p: Pointer to WRAM
     -- n: Number of bytes to write
     -- interval: If specified, size of array entries, where p is the address within the first array entry
@@ -75,7 +104,7 @@ function makeWriter(p, n, interval)
     end
 end
 
-sm = {}
+local sm = {}
 
 -- Button bitmasks --
 sm.button_B      = 0x8000
@@ -198,7 +227,7 @@ sm.getIdealLayer1YPosition     = makeReader(0x7E0B0E, 2)
 sm.getSamusPreviousXPosition   = makeReader(0x7E0B10, 2)
 sm.getSamusPreviousYPosition   = makeReader(0x7E0B14, 2)
 sm.getSamusYSubspeed           = makeReader(0x7E0B2C, 2)
-sm.getSamusYSpeed              = makeReader(0x7E0B2E, 2)
+sm.getSamusYSpeed              = makeReader(0x7E0B2E, 2, true)
 sm.getSamusYDirection          = makeReader(0x7E0B36, 2)
 sm.getSamusRunningMomentumFlag = makeReader(0x7E0B3C, 2)
 sm.getSpeedBoosterLevel        = makeReader(0x7E0B3F, 2)
@@ -848,5 +877,260 @@ sm.getAram_sampleTable                             = makeAramReader(0x4A00, 1, f
 sm.getAram_sampleData_echoBuffer                   = makeAramReader(0x4B00, 1, false, 1)
 -- ]]
 
+sm.poses = {
+    [0x00] = "Facing forward",
+    [0x01] = "Facing right, normal",
+    [0x02] = "Facing left, normal",
+    [0x03] = "Facing right, aiming up",
+    [0x04] = "Facing left, aiming up",
+    [0x05] = "Facing right, aiming upright",
+    [0x06] = "Facing left, aiming upleft",
+    [0x07] = "Facing right, aiming downright",
+    [0x08] = "Facing left, aiming downleft",
+    [0x09] = "Moving right, not aiming",
+    [0x0A] = "Moving left, not aiming",
+    [0x0B] = "Moving right, gun extended forward (not aiming)",
+    [0x0C] = "Moving left, gun extended forward (not aiming)",
+    [0x0D] = "Moving right, aiming straight up (unused?)",
+    [0x0E] = "Moving left, aiming straight up (unused?)",
+    [0x0F] = "Moving right, aiming upright",
+    [0x10] = "Moving left, aiming upleft",
+    [0x11] = "Moving right, aiming downright",
+    [0x12] = "Moving left, aiming downleft",
+    [0x13] = "Normal jump facing right, gun extended, not aiming or moving",
+    [0x14] = "Normal jump facing left, gun extended, not aiming or moving",
+    [0x15] = "Normal jump facing right, aiming up",
+    [0x16] = "Normal jump facing left, aiming up",
+    [0x17] = "Normal jump facing right, aiming down",
+    [0x18] = "Normal jump facing left, aiming down",
+    [0x19] = "Spin Jump right",
+    [0x1A] = "Spin Jump left",
+    [0x1B] = "Space jump right",
+    [0x1C] = "Space jump left",
+    [0x1D] = "Facing right as morphball, no springball",
+    [0x1E] = "Moving right as a morphball on ground without springball",
+    [0x1F] = "Moving left as a morphball on ground without springball",
+    [0x20] = "Spinjump right. Unused?",
+    [0x21] = "Spinjump right. Unused?",
+    [0x22] = "Spinjump right. Unused?",
+    [0x23] = "Spinjump right. Unused?",
+    [0x24] = "Spinjump right. Unused?",
+    [0x25] = "Starting standing right, turning left",
+    [0x26] = "Starting standing left, turning right",
+    [0x27] = "Crouching, facing right",
+    [0x28] = "Crouching, facing left",
+    [0x29] = "Falling facing right, normal pose",
+    [0x2A] = "Falling facing left, normal pose",
+    [0x2B] = "Falling facing right, aiming up",
+    [0x2C] = "Falling facing left, aiming up",
+    [0x2D] = "Falling facing right, aiming down",
+    [0x2E] = "Falling facing left, aiming down",
+    [0x2F] = "Starting with normal jump facing right, turning left",
+    [0x30] = "Starting with normal jump facing left, turning right",
+    [0x31] = "Midair morphball facing right without springball",
+    [0x32] = "Midair morphball facing left without springball",
+    [0x33] = "Spinjump right. Unused?",
+    [0x34] = "Spinjump right. Unused?",
+    [0x35] = "Crouch transition, facing right",
+    [0x36] = "Crouch transition, facing left",
+    [0x37] = "Morphing into ball, facing right. Ground and mid-air",
+    [0x38] = "Morphing into ball, facing left. Ground and mid-air",
+    [0x39] = "Midair morphing into ball, facing right? May be unused",
+    [0x3A] = "Midair morphing into ball, facing left? May be unused",
+    [0x3B] = "Standing from crouching, facing right",
+    [0x3C] = "Standing from crouching, facing left",
+    [0x3D] = "Demorph while facing right. Mid-air and on ground",
+    [0x3E] = "Demorph while facing left. Mid-air and on ground",
+    [0x3F] = "Some transition with morphball, facing right. Maybe unused",
+    [0x40] = "Some transition with morphball, facing left. Maybe unused",
+    [0x41] = "Staying still with morphball, facing left, no springball",
+    [0x42] = "Spinjump right. Unused?",
+    [0x43] = "Starting from crouching right, turning left",
+    [0x44] = "Starting from crouching left, turning right",
+    [0x45] = "Running, facing right, shooting left. Unused? (Fast moonwalk)",
+    [0x46] = "Running, facing left, shooting right. Unused? (Fast moonwalk)",
+    [0x47] = "Standing, facing right. Unused?",
+    [0x48] = "Standing, facing left. Unused?",
+    [0x49] = "Moonwalk, facing left",
+    [0x4A] = "Moonwalk, facing right",
+    [0x4B] = "Normal jump transition from ground(standing or crouching), facing right",
+    [0x4C] = "Normal jump transition from ground(standing or crouching), facing left",
+    [0x4D] = "Normal jump facing right, gun not extended, not aiming, not moving",
+    [0x4E] = "Normal jump facing left, gun not extended, not aiming, not moving",
+    [0x4F] = "Hurt roll back, moving right/facing left",
+    [0x50] = "Hurt roll back, moving left/facing right",
+    [0x51] = "Normal jump facing right, moving forward (gun extended)",
+    [0x52] = "Normal jump facing left, moving forward (gun extended)",
+    [0x53] = "Hurt, facing right",
+    [0x54] = "Hurt, facing left",
+    [0x55] = "Normal jump transition from ground, facing right and aiming up",
+    [0x56] = "Normal jump transition from ground, facing left and aiming up",
+    [0x57] = "Normal jump transition from ground, facing right and aiming upright",
+    [0x58] = "Normal jump transition from ground, facing left and aiming upleft",
+    [0x59] = "Normal jump transition from ground, facing right and aiming downright",
+    [0x5A] = "Normal jump transition from ground, facing left and aiming downleft",
+    [0x5B] = "Something for grapple (wall jump?), probably unused",
+    [0x5C] = "Something for grapple (wall jump?), probably unused",
+    [0x5D] = "Broken grapple? Facing clockwise, maybe unused",
+    [0x5E] = "Broken grapple? Facing clockwise, maybe unused",
+    [0x5F] = "Broken grapple? Facing clockwise, maybe unused",
+    [0x60] = "Better broken grapple. Facing clockwise, maybe unused",
+    [0x61] = "Nearly normal grapple. Facing clockwise, maybe unused",
+    [0x62] = "Nearly normal grapple. Facing counterclockwise, maybe unused",
+    [0x63] = "Facing left on grapple blocks, ready to jump. Unused?",
+    [0x64] = "Facing right on grapple blocks, ready to jump. Unused?",
+    [0x65] = "Glitchy jump, facing left. Used by unused grapple jump?",
+    [0x66] = "Glitchy jump, facing right. Used by unused grapple jump?",
+    [0x67] = "Facing right, falling, fired a shot",
+    [0x68] = "Facing left, falling, fired a shot",
+    [0x69] = "Normal jump facing right, aiming upright. Moving optional",
+    [0x6A] = "Normal jump facing left, aiming upleft. Moving optional",
+    [0x6B] = "Normal jump facing right, aiming downright. Moving optional",
+    [0x6C] = "Normal jump facing left, aiming downleft. Moving optional",
+    [0x6D] = "Falling facing right, aiming upright",
+    [0x6E] = "Falling facing left, aiming upleft",
+    [0x6F] = "Falling facing right, aiming downright",
+    [0x70] = "Falling facing left, aiming downleft",
+    [0x71] = "Standing to crouching, facing right and aiming upright",
+    [0x72] = "Standing to crouching, facing left and aiming upleft",
+    [0x73] = "Standing to crouching, facing right and aiming downright",
+    [0x74] = "Standing to crouching, facing left and aiming downleft",
+    [0x75] = "Moonwalk, facing left aiming upleft",
+    [0x76] = "Moonwalk, facing right aiming upright",
+    [0x77] = "Moonwalk, facing left aiming downleft",
+    [0x78] = "Moonwalk, facing right aiming downright",
+    [0x79] = "Spring ball on ground, facing right",
+    [0x7A] = "Spring ball on ground, facing left",
+    [0x7B] = "Spring ball on ground, moving right",
+    [0x7C] = "Spring ball on ground, moving left",
+    [0x7D] = "Spring ball falling, facing/moving right",
+    [0x7E] = "Spring ball falling, facing/moving left",
+    [0x7F] = "Spring ball jump in air, facing/moving right",
+    [0x80] = "Spring ball jump in air, facing/moving left",
+    [0x81] = "Screw attack right",
+    [0x82] = "Screw attack left",
+    [0x83] = "Walljump right",
+    [0x84] = "Walljump left",
+    [0x85] = "Crouching, facing right aiming up",
+    [0x86] = "Crouching, facing left aiming up",
+    [0x87] = "Turning from right to left while falling",
+    [0x88] = "Turning from left to right while falling",
+    [0x89] = "Ran into a wall on right (facing right)",
+    [0x8A] = "Ran into a wall on left (facing left)",
+    [0x8B] = "Turning around from right to left while aiming straight up while standing",
+    [0x8C] = "Turning around from left to right while aiming straight up while standing",
+    [0x8D] = "Turn around from right to left while aiming diagonal down while standing",
+    [0x8E] = "Turn around from left to right while aiming diagonal down while standing",
+    [0x8F] = "Turning around from right to left while aiming straight up in midair",
+    [0x90] = "Turning around from left to right while aiming straight up in midair",
+    [0x91] = "Turning around from right to left while aiming down or diagonal down in midair",
+    [0x92] = "Turning around from left to right while aiming down or diagonal down in midair",
+    [0x93] = "Turning around from right to left while aiming straight up while falling",
+    [0x94] = "Turning around from left to right while aiming straight up while falling",
+    [0x95] = "Turning around from right to left while aiming down or diagonal down while falling",
+    [0x96] = "Turning around from left to right while aiming down or diagonal down while falling",
+    [0x97] = "Turning around from right to left while aiming straight up while crouching",
+    [0x98] = "Turning around from left to right while aiming straight up while crouching",
+    [0x99] = "Turning around from right to left while aiming diagonal down while crouching",
+    [0x9A] = "Turning around from left to right while aiming diagonal down while crouching",
+    [0x9B] = "Facing forward, ala Elevator pose... with the Varia and/or Gravity Suit.",
+    [0x9C] = "Turning around from right to left while aiming diagonal up while standing",
+    [0x9D] = "Turning around from left to right while aiming diagonal up while standing",
+    [0x9E] = "Turning around from right to left while aiming diagonal up in midair",
+    [0x9F] = "Turning around from left to right while aiming diagonal up in midair",
+    [0xA0] = "Turning around from right to left while aiming diagonal up while falling",
+    [0xA1] = "Turning around from left to right while aiming diagonal up while falling",
+    [0xA2] = "Turn around from right to left while aiming diagonal up while crouching",
+    [0xA3] = "Turn around from left to right while aiming diagonal up while crouching",
+    [0xA4] = "Landing from normal jump, facing right",
+    [0xA5] = "Landing from normal jump, facing left",
+    [0xA6] = "Landing from spin jump, facing right",
+    [0xA7] = "Landing from spin jump, facing left",
+    [0xA8] = "Just standing, facing right. Unused? (Grapple movement)",
+    [0xA9] = "Just standing, facing left. Unused? (Grapple movement)",
+    [0xAA] = "Just standing, facing right aiming downright. Unused? (Grapple movement)",
+    [0xAB] = "Just standing, facing left aiming downleft. Unused? (Grapple movement)",
+    [0xAC] = "Jumping, facing right, gun extended. Unused? (Grapple movement)",
+    [0xAD] = "Jumping, facing left, gun extended. Unused? (Grapple movement)",
+    [0xAE] = "Jumping, facing right, aiming down. Unused? (Grapple movement)",
+    [0xAF] = "Jumping, facing left, aiming down. Unused? (Grapple movement)",
+    [0xB0] = "Jumping, facing right, aiming downright. Unused? (Grapple movement)",
+    [0xB1] = "Jumping, facing left, aiming downleft. Unused? (Grapple movement)",
+    [0xB2] = "Grapple, facing clockwise",
+    [0xB3] = "Grapple, facing counterclockwise",
+    [0xB4] = "Crouching, facing right. Unused? (Grapple movement)",
+    [0xB5] = "Crouching, facing left. Unused? (Grapple movement)",
+    [0xB6] = "Crouching, facing right, aiming downright. Unused? (Grapple movement)",
+    [0xB7] = "Crouching, facing left, aiming downleft. Unused? (Grapple movement)",
+    [0xB8] = "Grapple, attached to a wall on right, facing left",
+    [0xB9] = "Grapple, attached to a wall on left, facing right",
+    [0xBA] = "Grabbed by Draygon, facing left, not moving",
+    [0xBB] = "Grabbed by Draygon, facing left aiming upleft, not moving",
+    [0xBC] = "Grabbed by Draygon, facing left and firing",
+    [0xBD] = "Grabbed by Draygon, facing left aiming downleft, not moving",
+    [0xBE] = "Grabbed by Draygon, facing left, moving",
+    [0xBF] = "Jump/Turn right to left while moonwalking.",
+    [0xC0] = "Jump/Turn left to right while moonwalking.",
+    [0xC1] = "Jump/Turn right to left while moonwalking and aiming diagonal up.",
+    [0xC2] = "Jump/Turn left to right while moonwalking and aiming diagonal up.",
+    [0xC3] = "Jump/Turn right to left while moonwalking and aiming diagonal down.",
+    [0xC4] = "Jump/Turn left to right while moonwalking and aiming diagonal down.",
+    [0xC5] = "Morph ball, facing right. Unused? (Grabbed by Draygon movement)",
+    [0xC6] = "Morph ball, facing left. Unused? (Grabbed by Draygon movement)",
+    [0xC7] = "Super jump windup, facing right",
+    [0xC8] = "Super jump windup, facing left",
+    [0xC9] = "Horizontal super jump, right",
+    [0xCA] = "Horizontal super jump, left",
+    [0xCB] = "Vertical super jump, facing right",
+    [0xCC] = "Vertical super jump, facing left",
+    [0xCD] = "Diagonal super jump, right",
+    [0xCE] = "Diagonal super jump, left",
+    [0xCF] = "Samus ran right into a wall, is still holding right and is now aiming diagonal up",
+    [0xD0] = "Samus ran left into a wall, is still holding left and is now aiming diagonal up",
+    [0xD1] = "Samus ran right into a wall, is still holding right and is now aiming diagonal down",
+    [0xD2] = "Samus ran left into a wall, is still holding left and is now aiming diagonal down",
+    [0xD3] = "Crystal flash, facing right",
+    [0xD4] = "Crystal flash, facing left",
+    [0xD5] = "X-raying right, standing",
+    [0xD6] = "X-raying left, standing",
+    [0xD7] = "Crystal flash ending, facing right",
+    [0xD8] = "Crystal flash ending, facing left",
+    [0xD9] = "X-raying right, crouching",
+    [0xDA] = "X-raying left, crouching",
+    [0xDB] = "Standing transition to morphball, facing right? Unused?",
+    [0xDC] = "Standing transition to morphball, facing left? Unused?",
+    [0xDD] = "Morphball transition to standing, facing right? Unused?",
+    [0xDE] = "Morphball transition to standing, facing left? Unused?",
+    [0xDF] = "Samus is facing left as a morphball. Unused? (Grabbed by Draygon movement)",
+    [0xE0] = "Landing from normal jump, facing right and aiming up",
+    [0xE1] = "Landing from normal jump, facing left and aiming up",
+    [0xE2] = "Landing from normal jump, facing right and aiming upright",
+    [0xE3] = "Landing from normal jump, facing left and aiming upleft",
+    [0xE4] = "Landing from normal jump, facing right and aiming downright",
+    [0xE5] = "Landing from normal jump, facing left and aiming downleft",
+    [0xE6] = "Landing from normal jump, facing right, firing",
+    [0xE7] = "Landing from normal jump, facing left, firing",
+    [0xE8] = "Samus exhausted(Metroid drain, MB attack), facing right",
+    [0xE9] = "Samus exhausted(Metroid drain, MB attack), facing left",
+    [0xEA] = "Samus exhausted, looking up to watch Metroid attack MB, facing right",
+    [0xEB] = "Samus exhausted, looking up to watch Metroid attack MB, facing left",
+    [0xEC] = "Grabbed by Draygon, facing right. Not moving",
+    [0xED] = "Grabbed by Draygon, facing right aiming upright. Not moving",
+    [0xEC] = "Grabbed by Draygon, facing right and firing.",
+    [0xEF] = "Grabbed by Draygon, facing right aiming downright. Not moving",
+    [0xF0] = "Grabbed by Draygon, facing right. Moving",
+    [0xF1] = "Crouch transition, facing right and aiming up",
+    [0xF2] = "Crouch transition, facing left and aiming up",
+    [0xF3] = "Crouch transition, facing right and aiming upright",
+    [0xF4] = "Crouch transition, facing left and aiming upleft",
+    [0xF5] = "Crouch transition, facing right and aiming downright",
+    [0xF6] = "Crouch transition, facing left and aiming downleft",
+    [0xF7] = "Crouching to standing, facing right and aiming up",
+    [0xF8] = "Crouching to standing, facing left and aiming upleft",
+    [0xF9] = "Crouching to standing, facing right and aiming upright",
+    [0xFA] = "Crouching to standing, facing left and aiming upleft",
+    [0xFB] = "Crouching to standing, facing right and aiming downright",
+    [0xFC] = "Crouching to standing, facing left and aiming downleft",
+}
 
 return sm

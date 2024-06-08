@@ -1,148 +1,244 @@
 -- If lsnes complains about "module 'Super Metroid' not found", uncomment the next line and provide the path to the "Super Metroid.lua" file
 -- package.path = "C:\\Games\\Lua\\Super Metroid.lua"
 -- If Mesen complains about `require` not being recognised, you need to enable Lua IO access in the settings
-xemu = require("cross emu")
-sm = require("Super Metroid")
+local xemu = require("cross emu")
+local sm = require("Super Metroid")
 
-if console and console.clear then
-    console.clear()
-elseif print then
-    print("\n\n\n\n\n\n\n\n")
-    print("\n\n\n\n\n\n\n\n")
-end
-
-if gui and gui.clearGraphics then
-    gui.clearGraphics()
-elseif emu and emu.clearScreen then
-    emu.clearScreen()
-end
+-- TODO fix scroll and hitboxes
+-- TODO use luacanvas to draw blocks once
+        -- use a cache to save the drawing for a room
+        -- save PLMs in a table to draw them quickly
+-- TODO add grapcalc
 
 -- Globals
-recordLagHotspots = true
-debugControlsEnabled = 0
-debugFlag = 0
-debugInfoFlag = 0
-doorListFlag = 0
-followSamusFlag = 0--sm.button_B
-logFlag = 0
-xAdjust = 0
-yAdjust = 0
-doorList = {}
-previousSamusXPosition = 0
-previousSamusYPosition = 0
-previousSamusXSubposition = 0
-previousSamusYSubposition = 0
+local recordLagHotspots = true
+local debugControlsEnabled = 0
+local debugFlag = 0
+local debugInfoFlag = 0
+local doorListFlag = 0
+local followSamusFlag = 0--sm.button_B
+local logFlag = 0
+local xAdjust = 0
+local yAdjust = 0
+local doorList = {}
+
+local previousSamusXPosition = 0
+local previousSamusYPosition = 0
+local previousSamusXSubposition = 0
+local previousSamusYSubposition = 0
+
+local infohudRowHeight = 16
+local infohudRow1 = 72
+local infohudRow2 = infohudRow1 + (infohudRowHeight * 1)
+local infohudRow3 = infohudRow1 + (infohudRowHeight * 2)
+local infohudRow4 = infohudRow1 + (infohudRowHeight * 3)
+local infohudRow5 = infohudRow1 + (infohudRowHeight * 4)
+local infohudRow6 = infohudRow1 + (infohudRowHeight * 5)
+local infohudRow7 = infohudRow1 + (infohudRowHeight * 6)
+local infohudRow8 = infohudRow1 + (infohudRowHeight * 7)
+local infohudCol1 = 10
+local infohudCol2 = 174
+local infohudCol3 = 338
 
 -- Colour constants
-colour_opacity = 0x80
+local colour_opacity = (0xDD << 24)
 
-colour_slope        = 0x00FF0000 + xemu.rshift(colour_opacity, 1)
-colour_solidBlock   = 0xFF000000 + colour_opacity
-colour_specialBlock = 0x0000FF00 + colour_opacity
-colour_doorcap      = 0xFF800000 + colour_opacity
-colour_errorBlock   = 0x8000FF00 + colour_opacity
+local colour_slope        = 0x00FF00 | colour_opacity
+local colour_solidBlock   = 0xFF0000 | colour_opacity
+local colour_specialBlock = 0x0000FF | colour_opacity
+local colour_doorcap      = 0xFF8000 | colour_opacity
+local colour_errorBlock   = 0x8000FF | colour_opacity
 
-colour_scroll_red   = 0xFF000000 + colour_opacity
-colour_scroll_blue  = 0x0000FF00 + colour_opacity
-colour_scroll_green = 0x00FF0000 + colour_opacity
+local colour_scroll_red   = 0xFF0000 | colour_opacity
+local colour_scroll_blue  = 0x0000FF | colour_opacity
+local colour_scroll_green = 0x00FF00 | colour_opacity
 
-colour_enemy           = 0xFFFFFF00 + colour_opacity
-colour_spriteObject    = 0xFF800000 + colour_opacity
-colour_enemyProjectile = 0x00FF0000 + colour_opacity
-colour_powerBomb       = 0xFFFFFF00 + colour_opacity
-colour_projectile      = 0xFFFF0000 + colour_opacity
-                                                    
-colour_camera          = 0x80808000 + colour_opacity
+local colour_enemy           = 0xFFFFFF | colour_opacity
+local colour_spriteObject    = 0xFF8000 | colour_opacity
+local colour_enemyProjectile = 0x00FF00 | colour_opacity
+local colour_powerBomb       = 0xFFFFFF | colour_opacity
+local colour_projectile      = 0xFFFF00 | colour_opacity
 
-colour_samus            = 0x80FFFF00 + colour_opacity -- actual X distance = expected X distance
-colour_samus_armPumping = 0x00FF0000 + colour_opacity -- actual X distance > expected X distance
-colour_samus_2          = 0xFF800000 + colour_opacity -- actual X distance > expected X distance * 3 / 4
-colour_samus_3          = 0xFF000000 + colour_opacity -- actual X distance > expected X distance / 2
-colour_samus_4          = 0x80000000 + colour_opacity -- actual X distance <= expected X distance / 2
+local colour_camera          = 0x808080 | colour_opacity
 
--- Add padding borders in BizHawk (highly resource intensive)
-xExtra = 0
-yExtra = 0
-if xemu.emuId == xemu.emuId_bizhawk then
-    --xExtra = 256
-    --yExtra = 224
-    client.SetGameExtraPadding(xExtra, yExtra, xExtra, yExtra)
-end
+local colour_samus            = 0x80FFFF | colour_opacity -- actual X distance = expected X distance
+local colour_samus_armPumping = 0x00FF00 | colour_opacity -- actual X distance > expected X distance
+local colour_samus_2          = 0xFF8000 | colour_opacity -- actual X distance > expected X distance * 3 / 4
+local colour_samus_3          = 0xFF0000 | colour_opacity -- actual X distance > expected X distance / 2
+local colour_samus_4          = 0x800000 | colour_opacity -- actual X distance <= expected X distance / 2
 
-xExtraBlocks = xemu.rshift(xExtra, 4)
-yExtraBlocks = xemu.rshift(yExtra, 4)
 
-xExtraScrolls = xemu.rshift(xExtraBlocks, 4)
-yExtraScrolls = xemu.rshift(yExtraBlocks, 4)
-
--- Adjust drawing to account for the borders
-function drawText(x, y, text, fg, bg)
-    xemu.drawText(x + xExtra, y + yExtra, text, fg, bg or "black")
-end
-
-function drawBox(x0, y0, x1, y1, fg, bg)
-    xemu.drawBox(x0 + xExtra, y0 + yExtra, x1 + xExtra, y1 + yExtra, fg, bg or "clear")
-end
-
-function drawLine(x0, y0, x1, y1, fg)
-    xemu.drawLine(x0 + xExtra, y0 + yExtra, x1 + xExtra, y1 + yExtra, fg)
-end
-
-function drawRightTriangle(x0, y0, x1, y1, fg)
-    drawLine(x0, y0, x1, y1, fg)
-    drawLine(x0, y0, x1, y0, fg)
-    drawLine(x1, y0, x1, y1, fg)
-end
-
--- Display CPU usage
-if xemu.emuId == xemu.emuId_bizhawk and false then -- GUI drawing functions from on_paint are clearing this text output for some reason...
-    idling = false
-    lagFrames = 0
-    if recordLagHotspots then
-        outfile = io.open("lag.txt", "w")
-    end
-
-    function idleHook()
-        -- Report CPU time used by current frame
-        -- NMI occurs at v = 225
-        local v = emu.getregister('V')
-        local cpu = lagFrames * 100 + (v - 225) % 262 * 100 / 262
-        if recordLagHotspots and 100 <= cpu and cpu < 110 then
-            outfile:write(string.format("%d: %f\n", emu.framecount(), cpu))
-            console.log(string.format("%d: %f", emu.framecount(), cpu))
-        end
-        drawText(4, 36, string.format('CPU used: %.2f%%', cpu), cpu < 100 and "white" or "red", 0x000000FF)
-
-        idling = true
-        lagFrames = 0
-    end
-
-    function nmiHook()
-        if not idling then
-            lagFrames = lagFrames + 1
-            drawText(4, 36, string.format('CPU used: %.2f%%', lagFrames * 100), "red", 0x000000FF)
-        end
-
-        idling = false
-    end
-
-    event.onmemoryexecute(nmiHook, 0x009583)
-    event.onmemoryexecute(idleHook, 0x82897A)
+local function drawRightTriangle(x0, y0, x1, y1, fg)
+    gui.drawLine(x0, y0, x1, y1, fg)
+    gui.drawLine(x0, y0, x1, y0, fg)
+    gui.drawLine(x1, y0, x1, y1, fg)
 end
 
 
 -- A door database for finding valid OoB doors
-doors = {[0x88FE]=true, [0x890A]=true, [0x8916]=true, [0x8922]=true, [0x892E]=true, [0x893A]=true, [0x8946]=true, [0x8952]=true, [0x895E]=true, [0x896A]=true, [0x8976]=true, [0x8982]=true, [0x898E]=true, [0x899A]=true, [0x89A6]=true, [0x89B2]=true, [0x89BE]=true, [0x89CA]=true, [0x89D6]=true, [0x89E2]=true, [0x89EE]=true, [0x89FA]=true, [0x8A06]=true, [0x8A12]=true, [0x8A1E]=true, [0x8A2A]=true, [0x8A36]=true, [0x8A42]=true, [0x8A4E]=true, [0x8A5A]=true, [0x8A66]=true, [0x8A72]=true, [0x8A7E]=true, [0x8A8A]=true, [0x8A96]=true, [0x8AA2]=true, [0x8AAE]=true, [0x8ABA]=true, [0x8AC6]=true, [0x8AD2]=true, [0x8ADE]=true, [0x8AEA]=true, [0x8AF6]=true, [0x8B02]=true, [0x8B0E]=true, [0x8B1A]=true, [0x8B26]=true, [0x8B32]=true, [0x8B3E]=true, [0x8B4A]=true, [0x8B56]=true, [0x8B62]=true, [0x8B6E]=true, [0x8B7A]=true, [0x8B86]=true, [0x8B92]=true, [0x8B9E]=true, [0x8BAA]=true, [0x8BB6]=true, [0x8BC2]=true, [0x8BCE]=true, [0x8BDA]=true, [0x8BE6]=true, [0x8BF2]=true, [0x8BFE]=true, [0x8C0A]=true, [0x8C16]=true, [0x8C22]=true, [0x8C2E]=true, [0x8C3A]=true, [0x8C46]=true, [0x8C52]=true, [0x8C5E]=true, [0x8C6A]=true, [0x8C76]=true, [0x8C82]=true, [0x8C8E]=true, [0x8C9A]=true, [0x8CA6]=true, [0x8CB2]=true, [0x8CBE]=true, [0x8CCA]=true, [0x8CD6]=true, [0x8CE2]=true, [0x8CEE]=true, [0x8CFA]=true, [0x8D06]=true, [0x8D12]=true, [0x8D1E]=true, [0x8D2A]=true, [0x8D36]=true, [0x8D42]=true, [0x8D4E]=true, [0x8D5A]=true, [0x8D66]=true, [0x8D72]=true, [0x8D7E]=true, [0x8D8A]=true, [0x8D96]=true, [0x8DA2]=true, [0x8DAE]=true, [0x8DBA]=true, [0x8DC6]=true, [0x8DD2]=true, [0x8DDE]=true, [0x8DEA]=true, [0x8DF6]=true, [0x8E02]=true, [0x8E0E]=true, [0x8E1A]=true, [0x8E26]=true, [0x8E32]=true, [0x8E3E]=true, [0x8E4A]=true, [0x8E56]=true, [0x8E62]=true, [0x8E6E]=true, [0x8E7A]=true, [0x8E86]=true, [0x8E92]=true, [0x8E9E]=true, [0x8EAA]=true, [0x8EB6]=true, [0x8EC2]=true, [0x8ECE]=true, [0x8EDA]=true, [0x8EE6]=true, [0x8EF2]=true, [0x8EFE]=true, [0x8F0A]=true, [0x8F16]=true, [0x8F22]=true, [0x8F2E]=true, [0x8F3A]=true, [0x8F46]=true, [0x8F52]=true, [0x8F5E]=true, [0x8F6A]=true, [0x8F76]=true, [0x8F82]=true, [0x8F8E]=true, [0x8F9A]=true, [0x8FA6]=true, [0x8FB2]=true, [0x8FBE]=true, [0x8FCA]=true, [0x8FD6]=true, [0x8FE2]=true, [0x8FEE]=true, [0x8FFA]=true, [0x9006]=true, [0x9012]=true, [0x901E]=true, [0x902A]=true, [0x9036]=true, [0x9042]=true, [0x904E]=true, [0x905A]=true, [0x9066]=true, [0x9072]=true, [0x907E]=true, [0x908A]=true, [0x9096]=true, [0x90A2]=true, [0x90AE]=true, [0x90BA]=true, [0x90C6]=true, [0x90D2]=true, [0x90DE]=true, [0x90EA]=true, [0x90F6]=true, [0x9102]=true, [0x910E]=true, [0x911A]=true, [0x9126]=true, [0x9132]=true, [0x913E]=true, [0x914A]=true, [0x9156]=true, [0x9162]=true, [0x916E]=true, [0x917A]=true, [0x9186]=true, [0x9192]=true, [0x919E]=true, [0x91AA]=true, [0x91B6]=true, [0x91C2]=true, [0x91CE]=true, [0x91DA]=true, [0x91E6]=true, [0x91F2]=true, [0x91FE]=true, [0x920A]=true, [0x9216]=true, [0x9222]=true, [0x922E]=true, [0x923A]=true, [0x9246]=true, [0x9252]=true, [0x925E]=true, [0x926A]=true, [0x9276]=true, [0x9282]=true, [0x928E]=true, [0x929A]=true, [0x92A6]=true, [0x92B2]=true, [0x92BE]=true, [0x92CA]=true, [0x92D6]=true, [0x92E2]=true, [0x92EE]=true, [0x92FA]=true, [0x9306]=true, [0x9312]=true, [0x931E]=true, [0x932A]=true, [0x9336]=true, [0x9342]=true, [0x934E]=true, [0x935A]=true, [0x9366]=true, [0x9372]=true, [0x937E]=true, [0x938A]=true, [0x9396]=true, [0x93A2]=true, [0x93AE]=true, [0x93BA]=true, [0x93C6]=true, [0x93D2]=true, [0x93DE]=true, [0x93EA]=true, [0x93F6]=true, [0x9402]=true, [0x940E]=true, [0x941A]=true, [0x9426]=true, [0x9432]=true, [0x943E]=true, [0x944A]=true, [0x9456]=true, [0x9462]=true, [0x946E]=true, [0x947A]=true, [0x9486]=true, [0x9492]=true, [0x949E]=true, [0x94AA]=true, [0x94B6]=true, [0x94C2]=true, [0x94CE]=true, [0x94DA]=true, [0x94E6]=true, [0x94F2]=true, [0x94FE]=true, [0x950A]=true, [0x9516]=true, [0x9522]=true, [0x952E]=true, [0x953A]=true, [0x9546]=true, [0x9552]=true, [0x955E]=true, [0x956A]=true, [0x9576]=true, [0x9582]=true, [0x958E]=true, [0x959A]=true, [0x95A6]=true, [0x95B2]=true, [0x95BE]=true, [0x95CA]=true, [0x95D6]=true, [0x95E2]=true, [0x95EE]=true, [0x95FA]=true, [0x9606]=true, [0x9612]=true, [0x961E]=true, [0x962A]=true, [0x9636]=true, [0x9642]=true, [0x964E]=true, [0x965A]=true, [0x9666]=true, [0x9672]=true, [0x967E]=true, [0x968A]=true, [0x9696]=true, [0x96A2]=true, [0x96AE]=true, [0x96BA]=true, [0x96C6]=true, [0x96D2]=true, [0x96DE]=true, [0x96EA]=true, [0x96F6]=true, [0x9702]=true, [0x970E]=true, [0x971A]=true, [0x9726]=true, [0x9732]=true, [0x973E]=true, [0x974A]=true, [0x9756]=true, [0x9762]=true, [0x976E]=true, [0x977A]=true, [0x9786]=true, [0x9792]=true, [0x979E]=true, [0x97AA]=true, [0x97B6]=true, [0x97C2]=true, [0x97CE]=true, [0x97DA]=true, [0x97E6]=true, [0x97F2]=true, [0x97FE]=true, [0x980A]=true, [0x9816]=true, [0x9822]=true, [0x982E]=true, [0x983A]=true, [0x9846]=true, [0x9852]=true, [0x985E]=true, [0x986A]=true, [0x9876]=true, [0x9882]=true, [0x988E]=true, [0x989A]=true, [0x98A6]=true, [0x98B2]=true, [0x98BE]=true, [0x98CA]=true, [0x98D6]=true, [0x98E2]=true, [0x98EE]=true, [0x98FA]=true, [0x9906]=true, [0x9912]=true, [0x991E]=true, [0x992A]=true, [0x9936]=true, [0x9942]=true, [0x994E]=true, [0x995A]=true, [0x9966]=true, [0x9972]=true, [0x997E]=true, [0x998A]=true, [0x9996]=true, [0x99A2]=true, [0x99AE]=true, [0x99BA]=true, [0x99C6]=true, [0x99D2]=true, [0x99DE]=true, [0x99EA]=true, [0x99F6]=true, [0x9A02]=true, [0x9A0E]=true, [0x9A1A]=true, [0x9A26]=true, [0x9A32]=true, [0x9A3E]=true, [0x9A4A]=true, [0x9A56]=true, [0x9A62]=true, [0x9A6E]=true, [0x9A7A]=true, [0x9A86]=true, [0x9A92]=true, [0x9A9E]=true, [0x9AAA]=true, [0x9AB6]=true, [0xA18C]=true, [0xA198]=true, [0xA1A4]=true, [0xA1B0]=true, [0xA1BC]=true, [0xA1C8]=true, [0xA1D4]=true, [0xA1E0]=true, [0xA1EC]=true, [0xA1F8]=true, [0xA204]=true, [0xA210]=true, [0xA21C]=true, [0xA228]=true, [0xA234]=true, [0xA240]=true, [0xA24C]=true, [0xA258]=true, [0xA264]=true, [0xA270]=true, [0xA27C]=true, [0xA288]=true, [0xA294]=true, [0xA2A0]=true, [0xA2AC]=true, [0xA2B8]=true, [0xA2C4]=true, [0xA2D0]=true, [0xA2DC]=true, [0xA2E8]=true, [0xA2F4]=true, [0xA300]=true, [0xA30C]=true, [0xA318]=true, [0xA324]=true, [0xA330]=true, [0xA33C]=true, [0xA348]=true, [0xA354]=true, [0xA360]=true, [0xA36C]=true, [0xA378]=true, [0xA384]=true, [0xA390]=true, [0xA39C]=true, [0xA3A8]=true, [0xA3B4]=true, [0xA3C0]=true, [0xA3CC]=true, [0xA3D8]=true, [0xA3E4]=true, [0xA3F0]=true, [0xA3FC]=true, [0xA408]=true, [0xA414]=true, [0xA420]=true, [0xA42C]=true, [0xA438]=true, [0xA444]=true, [0xA450]=true, [0xA45C]=true, [0xA468]=true, [0xA474]=true, [0xA480]=true, [0xA48C]=true, [0xA498]=true, [0xA4A4]=true, [0xA4B0]=true, [0xA4BC]=true, [0xA4C8]=true, [0xA4D4]=true, [0xA4E0]=true, [0xA4EC]=true, [0xA4F8]=true, [0xA504]=true, [0xA510]=true, [0xA51C]=true, [0xA528]=true, [0xA534]=true, [0xA540]=true, [0xA54C]=true, [0xA558]=true, [0xA564]=true, [0xA570]=true, [0xA57C]=true, [0xA588]=true, [0xA594]=true, [0xA5A0]=true, [0xA5AC]=true, [0xA5B8]=true, [0xA5C4]=true, [0xA5D0]=true, [0xA5DC]=true, [0xA5E8]=true, [0xA5F4]=true, [0xA600]=true, [0xA60C]=true, [0xA618]=true, [0xA624]=true, [0xA630]=true, [0xA63C]=true, [0xA648]=true, [0xA654]=true, [0xA660]=true, [0xA66C]=true, [0xA678]=true, [0xA684]=true, [0xA690]=true, [0xA69C]=true, [0xA6A8]=true, [0xA6B4]=true, [0xA6C0]=true, [0xA6CC]=true, [0xA6D8]=true, [0xA6E4]=true, [0xA6F0]=true, [0xA6FC]=true, [0xA708]=true, [0xA714]=true, [0xA720]=true, [0xA72C]=true, [0xA738]=true, [0xA744]=true, [0xA750]=true, [0xA75C]=true, [0xA768]=true, [0xA774]=true, [0xA780]=true, [0xA78C]=true, [0xA798]=true, [0xA7A4]=true, [0xA7B0]=true, [0xA7BC]=true, [0xA7C8]=true, [0xA7D4]=true, [0xA7E0]=true, [0xA7EC]=true, [0xA7F8]=true, [0xA810]=true, [0xA828]=true, [0xA834]=true, [0xA840]=true, [0xA84C]=true, [0xA858]=true, [0xA864]=true, [0xA870]=true, [0xA87C]=true, [0xA888]=true, [0xA894]=true, [0xA8A0]=true, [0xA8AC]=true, [0xA8B8]=true, [0xA8C4]=true, [0xA8D0]=true, [0xA8DC]=true, [0xA8E8]=true, [0xA8F4]=true, [0xA900]=true, [0xA90C]=true, [0xA918]=true, [0xA924]=true, [0xA930]=true, [0xA93C]=true, [0xA948]=true, [0xA954]=true, [0xA960]=true, [0xA96C]=true, [0xA978]=true, [0xA984]=true, [0xA990]=true, [0xA99C]=true, [0xA9A8]=true, [0xA9B4]=true, [0xA9C0]=true, [0xA9CC]=true, [0xA9D8]=true, [0xA9E4]=true, [0xA9F0]=true, [0xA9FC]=true, [0xAA08]=true, [0xAA14]=true, [0xAA20]=true, [0xAA2C]=true, [0xAA38]=true, [0xAA44]=true, [0xAA50]=true, [0xAA5C]=true, [0xAA68]=true, [0xAA74]=true, [0xAA80]=true, [0xAA8C]=true, [0xAA98]=true, [0xAAA4]=true, [0xAAB0]=true, [0xAABC]=true, [0xAAC8]=true, [0xAAD4]=true, [0xAAE0]=true, [0xAAEC]=true, [0xAAF8]=true, [0xAB04]=true, [0xAB10]=true, [0xAB1C]=true, [0xAB28]=true, [0xAB34]=true, [0xAB40]=true, [0xAB4C]=true, [0xAB58]=true, [0xAB64]=true, [0xAB70]=true, [0xAB7C]=true, [0xAB88]=true, [0xAB94]=true, [0xABA0]=true, [0xABAC]=true, [0xABB8]=true, [0xABC4]=true, [0xABCF]=true, [0xABDA]=true, [0xABE5]=true}
+local doors = {
+    [0x88FE]=true, [0x890A]=true, [0x8916]=true, [0x8922]=true,
+    [0x892E]=true, [0x893A]=true, [0x8946]=true, [0x8952]=true,
+    [0x895E]=true, [0x896A]=true, [0x8976]=true, [0x8982]=true,
+    [0x898E]=true, [0x899A]=true, [0x89A6]=true, [0x89B2]=true,
+    [0x89BE]=true, [0x89CA]=true, [0x89D6]=true, [0x89E2]=true,
+    [0x89EE]=true, [0x89FA]=true, [0x8A06]=true, [0x8A12]=true,
+    [0x8A1E]=true, [0x8A2A]=true, [0x8A36]=true, [0x8A42]=true,
+    [0x8A4E]=true, [0x8A5A]=true, [0x8A66]=true, [0x8A72]=true,
+    [0x8A7E]=true, [0x8A8A]=true, [0x8A96]=true, [0x8AA2]=true,
+    [0x8AAE]=true, [0x8ABA]=true, [0x8AC6]=true, [0x8AD2]=true,
+    [0x8ADE]=true, [0x8AEA]=true, [0x8AF6]=true, [0x8B02]=true,
+    [0x8B0E]=true, [0x8B1A]=true, [0x8B26]=true, [0x8B32]=true,
+    [0x8B3E]=true, [0x8B4A]=true, [0x8B56]=true, [0x8B62]=true,
+    [0x8B6E]=true, [0x8B7A]=true, [0x8B86]=true, [0x8B92]=true,
+    [0x8B9E]=true, [0x8BAA]=true, [0x8BB6]=true, [0x8BC2]=true,
+    [0x8BCE]=true, [0x8BDA]=true, [0x8BE6]=true, [0x8BF2]=true,
+    [0x8BFE]=true, [0x8C0A]=true, [0x8C16]=true, [0x8C22]=true,
+    [0x8C2E]=true, [0x8C3A]=true, [0x8C46]=true, [0x8C52]=true,
+    [0x8C5E]=true, [0x8C6A]=true, [0x8C76]=true, [0x8C82]=true,
+    [0x8C8E]=true, [0x8C9A]=true, [0x8CA6]=true, [0x8CB2]=true,
+    [0x8CBE]=true, [0x8CCA]=true, [0x8CD6]=true, [0x8CE2]=true,
+    [0x8CEE]=true, [0x8CFA]=true, [0x8D06]=true, [0x8D12]=true,
+    [0x8D1E]=true, [0x8D2A]=true, [0x8D36]=true, [0x8D42]=true,
+    [0x8D4E]=true, [0x8D5A]=true, [0x8D66]=true, [0x8D72]=true,
+    [0x8D7E]=true, [0x8D8A]=true, [0x8D96]=true, [0x8DA2]=true,
+    [0x8DAE]=true, [0x8DBA]=true, [0x8DC6]=true, [0x8DD2]=true,
+    [0x8DDE]=true, [0x8DEA]=true, [0x8DF6]=true, [0x8E02]=true,
+    [0x8E0E]=true, [0x8E1A]=true, [0x8E26]=true, [0x8E32]=true,
+    [0x8E3E]=true, [0x8E4A]=true, [0x8E56]=true, [0x8E62]=true,
+    [0x8E6E]=true, [0x8E7A]=true, [0x8E86]=true, [0x8E92]=true,
+    [0x8E9E]=true, [0x8EAA]=true, [0x8EB6]=true, [0x8EC2]=true,
+    [0x8ECE]=true, [0x8EDA]=true, [0x8EE6]=true, [0x8EF2]=true,
+    [0x8EFE]=true, [0x8F0A]=true, [0x8F16]=true, [0x8F22]=true,
+    [0x8F2E]=true, [0x8F3A]=true, [0x8F46]=true, [0x8F52]=true,
+    [0x8F5E]=true, [0x8F6A]=true, [0x8F76]=true, [0x8F82]=true,
+    [0x8F8E]=true, [0x8F9A]=true, [0x8FA6]=true, [0x8FB2]=true,
+    [0x8FBE]=true, [0x8FCA]=true, [0x8FD6]=true, [0x8FE2]=true,
+    [0x8FEE]=true, [0x8FFA]=true, [0x9006]=true, [0x9012]=true,
+    [0x901E]=true, [0x902A]=true, [0x9036]=true, [0x9042]=true,
+    [0x904E]=true, [0x905A]=true, [0x9066]=true, [0x9072]=true,
+    [0x907E]=true, [0x908A]=true, [0x9096]=true, [0x90A2]=true,
+    [0x90AE]=true, [0x90BA]=true, [0x90C6]=true, [0x90D2]=true,
+    [0x90DE]=true, [0x90EA]=true, [0x90F6]=true, [0x9102]=true,
+    [0x910E]=true, [0x911A]=true, [0x9126]=true, [0x9132]=true,
+    [0x913E]=true, [0x914A]=true, [0x9156]=true, [0x9162]=true,
+    [0x916E]=true, [0x917A]=true, [0x9186]=true, [0x9192]=true,
+    [0x919E]=true, [0x91AA]=true, [0x91B6]=true, [0x91C2]=true,
+    [0x91CE]=true, [0x91DA]=true, [0x91E6]=true, [0x91F2]=true,
+    [0x91FE]=true, [0x920A]=true, [0x9216]=true, [0x9222]=true,
+    [0x922E]=true, [0x923A]=true, [0x9246]=true, [0x9252]=true,
+    [0x925E]=true, [0x926A]=true, [0x9276]=true, [0x9282]=true,
+    [0x928E]=true, [0x929A]=true, [0x92A6]=true, [0x92B2]=true,
+    [0x92BE]=true, [0x92CA]=true, [0x92D6]=true, [0x92E2]=true,
+    [0x92EE]=true, [0x92FA]=true, [0x9306]=true, [0x9312]=true,
+    [0x931E]=true, [0x932A]=true, [0x9336]=true, [0x9342]=true,
+    [0x934E]=true, [0x935A]=true, [0x9366]=true, [0x9372]=true,
+    [0x937E]=true, [0x938A]=true, [0x9396]=true, [0x93A2]=true,
+    [0x93AE]=true, [0x93BA]=true, [0x93C6]=true, [0x93D2]=true,
+    [0x93DE]=true, [0x93EA]=true, [0x93F6]=true, [0x9402]=true,
+    [0x940E]=true, [0x941A]=true, [0x9426]=true, [0x9432]=true,
+    [0x943E]=true, [0x944A]=true, [0x9456]=true, [0x9462]=true,
+    [0x946E]=true, [0x947A]=true, [0x9486]=true, [0x9492]=true,
+    [0x949E]=true, [0x94AA]=true, [0x94B6]=true, [0x94C2]=true,
+    [0x94CE]=true, [0x94DA]=true, [0x94E6]=true, [0x94F2]=true,
+    [0x94FE]=true, [0x950A]=true, [0x9516]=true, [0x9522]=true,
+    [0x952E]=true, [0x953A]=true, [0x9546]=true, [0x9552]=true,
+    [0x955E]=true, [0x956A]=true, [0x9576]=true, [0x9582]=true,
+    [0x958E]=true, [0x959A]=true, [0x95A6]=true, [0x95B2]=true,
+    [0x95BE]=true, [0x95CA]=true, [0x95D6]=true, [0x95E2]=true,
+    [0x95EE]=true, [0x95FA]=true, [0x9606]=true, [0x9612]=true,
+    [0x961E]=true, [0x962A]=true, [0x9636]=true, [0x9642]=true,
+    [0x964E]=true, [0x965A]=true, [0x9666]=true, [0x9672]=true,
+    [0x967E]=true, [0x968A]=true, [0x9696]=true, [0x96A2]=true,
+    [0x96AE]=true, [0x96BA]=true, [0x96C6]=true, [0x96D2]=true,
+    [0x96DE]=true, [0x96EA]=true, [0x96F6]=true, [0x9702]=true,
+    [0x970E]=true, [0x971A]=true, [0x9726]=true, [0x9732]=true,
+    [0x973E]=true, [0x974A]=true, [0x9756]=true, [0x9762]=true,
+    [0x976E]=true, [0x977A]=true, [0x9786]=true, [0x9792]=true,
+    [0x979E]=true, [0x97AA]=true, [0x97B6]=true, [0x97C2]=true,
+    [0x97CE]=true, [0x97DA]=true, [0x97E6]=true, [0x97F2]=true,
+    [0x97FE]=true, [0x980A]=true, [0x9816]=true, [0x9822]=true,
+    [0x982E]=true, [0x983A]=true, [0x9846]=true, [0x9852]=true,
+    [0x985E]=true, [0x986A]=true, [0x9876]=true, [0x9882]=true,
+    [0x988E]=true, [0x989A]=true, [0x98A6]=true, [0x98B2]=true,
+    [0x98BE]=true, [0x98CA]=true, [0x98D6]=true, [0x98E2]=true,
+    [0x98EE]=true, [0x98FA]=true, [0x9906]=true, [0x9912]=true,
+    [0x991E]=true, [0x992A]=true, [0x9936]=true, [0x9942]=true,
+    [0x994E]=true, [0x995A]=true, [0x9966]=true, [0x9972]=true,
+    [0x997E]=true, [0x998A]=true, [0x9996]=true, [0x99A2]=true,
+    [0x99AE]=true, [0x99BA]=true, [0x99C6]=true, [0x99D2]=true,
+    [0x99DE]=true, [0x99EA]=true, [0x99F6]=true, [0x9A02]=true,
+    [0x9A0E]=true, [0x9A1A]=true, [0x9A26]=true, [0x9A32]=true,
+    [0x9A3E]=true, [0x9A4A]=true, [0x9A56]=true, [0x9A62]=true,
+    [0x9A6E]=true, [0x9A7A]=true, [0x9A86]=true, [0x9A92]=true,
+    [0x9A9E]=true, [0x9AAA]=true, [0x9AB6]=true, [0xA18C]=true,
+    [0xA198]=true, [0xA1A4]=true, [0xA1B0]=true, [0xA1BC]=true,
+    [0xA1C8]=true, [0xA1D4]=true, [0xA1E0]=true, [0xA1EC]=true,
+    [0xA1F8]=true, [0xA204]=true, [0xA210]=true, [0xA21C]=true,
+    [0xA228]=true, [0xA234]=true, [0xA240]=true, [0xA24C]=true,
+    [0xA258]=true, [0xA264]=true, [0xA270]=true, [0xA27C]=true,
+    [0xA288]=true, [0xA294]=true, [0xA2A0]=true, [0xA2AC]=true,
+    [0xA2B8]=true, [0xA2C4]=true, [0xA2D0]=true, [0xA2DC]=true,
+    [0xA2E8]=true, [0xA2F4]=true, [0xA300]=true, [0xA30C]=true,
+    [0xA318]=true, [0xA324]=true, [0xA330]=true, [0xA33C]=true,
+    [0xA348]=true, [0xA354]=true, [0xA360]=true, [0xA36C]=true,
+    [0xA378]=true, [0xA384]=true, [0xA390]=true, [0xA39C]=true,
+    [0xA3A8]=true, [0xA3B4]=true, [0xA3C0]=true, [0xA3CC]=true,
+    [0xA3D8]=true, [0xA3E4]=true, [0xA3F0]=true, [0xA3FC]=true,
+    [0xA408]=true, [0xA414]=true, [0xA420]=true, [0xA42C]=true,
+    [0xA438]=true, [0xA444]=true, [0xA450]=true, [0xA45C]=true,
+    [0xA468]=true, [0xA474]=true, [0xA480]=true, [0xA48C]=true,
+    [0xA498]=true, [0xA4A4]=true, [0xA4B0]=true, [0xA4BC]=true,
+    [0xA4C8]=true, [0xA4D4]=true, [0xA4E0]=true, [0xA4EC]=true,
+    [0xA4F8]=true, [0xA504]=true, [0xA510]=true, [0xA51C]=true,
+    [0xA528]=true, [0xA534]=true, [0xA540]=true, [0xA54C]=true,
+    [0xA558]=true, [0xA564]=true, [0xA570]=true, [0xA57C]=true,
+    [0xA588]=true, [0xA594]=true, [0xA5A0]=true, [0xA5AC]=true,
+    [0xA5B8]=true, [0xA5C4]=true, [0xA5D0]=true, [0xA5DC]=true,
+    [0xA5E8]=true, [0xA5F4]=true, [0xA600]=true, [0xA60C]=true,
+    [0xA618]=true, [0xA624]=true, [0xA630]=true, [0xA63C]=true,
+    [0xA648]=true, [0xA654]=true, [0xA660]=true, [0xA66C]=true,
+    [0xA678]=true, [0xA684]=true, [0xA690]=true, [0xA69C]=true,
+    [0xA6A8]=true, [0xA6B4]=true, [0xA6C0]=true, [0xA6CC]=true,
+    [0xA6D8]=true, [0xA6E4]=true, [0xA6F0]=true, [0xA6FC]=true,
+    [0xA708]=true, [0xA714]=true, [0xA720]=true, [0xA72C]=true,
+    [0xA738]=true, [0xA744]=true, [0xA750]=true, [0xA75C]=true,
+    [0xA768]=true, [0xA774]=true, [0xA780]=true, [0xA78C]=true,
+    [0xA798]=true, [0xA7A4]=true, [0xA7B0]=true, [0xA7BC]=true,
+    [0xA7C8]=true, [0xA7D4]=true, [0xA7E0]=true, [0xA7EC]=true,
+    [0xA7F8]=true, [0xA810]=true, [0xA828]=true, [0xA834]=true,
+    [0xA840]=true, [0xA84C]=true, [0xA858]=true, [0xA864]=true,
+    [0xA870]=true, [0xA87C]=true, [0xA888]=true, [0xA894]=true,
+    [0xA8A0]=true, [0xA8AC]=true, [0xA8B8]=true, [0xA8C4]=true,
+    [0xA8D0]=true, [0xA8DC]=true, [0xA8E8]=true, [0xA8F4]=true,
+    [0xA900]=true, [0xA90C]=true, [0xA918]=true, [0xA924]=true,
+    [0xA930]=true, [0xA93C]=true, [0xA948]=true, [0xA954]=true,
+    [0xA960]=true, [0xA96C]=true, [0xA978]=true, [0xA984]=true,
+    [0xA990]=true, [0xA99C]=true, [0xA9A8]=true, [0xA9B4]=true,
+    [0xA9C0]=true, [0xA9CC]=true, [0xA9D8]=true, [0xA9E4]=true,
+    [0xA9F0]=true, [0xA9FC]=true, [0xAA08]=true, [0xAA14]=true,
+    [0xAA20]=true, [0xAA2C]=true, [0xAA38]=true, [0xAA44]=true,
+    [0xAA50]=true, [0xAA5C]=true, [0xAA68]=true, [0xAA74]=true,
+    [0xAA80]=true, [0xAA8C]=true, [0xAA98]=true, [0xAAA4]=true,
+    [0xAAB0]=true, [0xAABC]=true, [0xAAC8]=true, [0xAAD4]=true,
+    [0xAAE0]=true, [0xAAEC]=true, [0xAAF8]=true, [0xAB04]=true,
+    [0xAB10]=true, [0xAB1C]=true, [0xAB28]=true, [0xAB34]=true,
+    [0xAB40]=true, [0xAB4C]=true, [0xAB58]=true, [0xAB64]=true,
+    [0xAB70]=true, [0xAB7C]=true, [0xAB88]=true, [0xAB94]=true,
+    [0xABA0]=true, [0xABAC]=true, [0xABB8]=true, [0xABC4]=true,
+    [0xABCF]=true, [0xABDA]=true, [0xABE5]=true,
+}
 
 
 -- Draw standard block outline
-function standardOutline(colour)
+local function standardOutline(colour)
     return function(blockX, blockY, blockIndex, stackLimit)
-        drawBox(blockX, blockY, blockX + 15, blockY + 15, colour, "clear")
+        gui.drawRectangle(blockX, blockY, 15, 15, colour)
     end
 end
 
 -- Block drawing functions
+local outline = {}
 outline = {
     -- Air
     [0x00] = function(blockX, blockY, blockIndex, stackLimit) end,
@@ -150,9 +246,9 @@ outline = {
     -- Slope
     [0x01] = function(blockX, blockY, blockIndex, stackLimit)
         local bts = sm.getBts(blockIndex)
-        local i_slope = xemu.and_(bts, 0x1F)
-        local flip_x = xemu.and_(bts, 0x40) ~= 0
-        local flip_y = xemu.and_(bts, 0x80) ~= 0
+        local i_slope = (bts & 0x1F)
+        local flip_x = (bts & 0x40) ~= 0
+        local flip_y = (bts & 0x80) ~= 0
 
         local p_slope = 0x948B2B + i_slope * 0x10
 
@@ -197,16 +293,16 @@ outline = {
             y_base = 0xF - y_base
         end
 
-        xemu.drawLine(blockX + x_min, blockY + y_base, blockX + x_min, blockY + ys[x_min], colour_slope)
+        gui.drawLine(blockX + x_min, blockY + y_base, blockX + x_min, blockY + ys[x_min], colour_slope)
 
         for x = x_min + 1, x_max do
             if ys[x - 1] < 0x10 and ys[x] < 0x10 then
-                xemu.drawLine(blockX + x, blockY + ys[x - 1], blockX + x, blockY + ys[x], colour_slope)
+                gui.drawLine(blockX + x, blockY + ys[x - 1], blockX + x, blockY + ys[x], colour_slope)
             end
         end
 
-        xemu.drawLine(blockX + x_max, blockY + y_base, blockX + x_max, blockY + ys[x_max], colour_slope)
-        xemu.drawLine(blockX + x_min, blockY + y_base, blockX + x_max, blockY + y_base, colour_slope)
+        gui.drawLine(blockX + x_max, blockY + y_base, blockX + x_max, blockY + ys[x_max], colour_slope)
+        gui.drawLine(blockX + x_min, blockY + y_base, blockX + x_max, blockY + y_base, colour_slope)
     end,
 
     -- Spike air
@@ -236,7 +332,7 @@ outline = {
         end
 
         blockIndex = blockIndex + bts
-        outline[xemu.rshift(sm.getLevelDatum(blockIndex), 12)](blockX, blockY, blockIndex, stackLimit)
+        outline[sm.getLevelDatum(blockIndex) >> 12](blockX, blockY, blockIndex, stackLimit)
     end,
 
     -- Unused air
@@ -286,7 +382,7 @@ outline = {
         end
 
         blockIndex = blockIndex + bts * sm.getRoomWidth()
-        outline[xemu.rshift(sm.getLevelDatum(blockIndex), 12)](blockX, blockY, blockIndex, stackLimit)
+        outline[sm.getLevelDatum(blockIndex) >> 12](blockX, blockY, blockIndex, stackLimit)
     end,
 
     -- Grapple block
@@ -296,8 +392,7 @@ outline = {
     [0x0F] = standardOutline(colour_specialBlock)
 }
 
-
-function isValidLevelData()
+local function isValidLevelData()
     -- The screen refresh should only be done when the game is in a valid state to draw the level data.
     -- Game state 8 is main gameplay, level data is always valid.
     -- Game states 9, Ah and Bh are the various stages of going through a door,
@@ -317,67 +412,46 @@ function isValidLevelData()
         or gameState == 0xB and doorTransitionFunction ~= 0xE36E
 end
 
-function handleDebugControls()
+local function handleDebugControls()
     local input = sm.getInput()
     local changedInput = sm.getChangedInput()
 
-    if xemu.and_(input, sm.button_select) == 0 then
+    if (input & sm.button_select) == 0 then
         return
     end
 
     -- Show the clipdata and BTS of every block on screen
-    debugFlag = xemu.xor(debugFlag, xemu.and_(changedInput, sm.button_A))
+    debugFlag = (debugFlag ~ (changedInput & sm.button_A))
 
     -- Show the list of (possibly OoB) door block BTS that exist
     doorListFlag = debugFlag
 
     -- Lock camera to Samus' position
-    followSamusFlag = xemu.xor(followSamusFlag, xemu.and_(changedInput, sm.button_B))
+    followSamusFlag = (followSamusFlag ~ (changedInput & sm.button_B))
 
     -- Initialise door list
     for i = 0,0x7F do
         doorList[i] = 0
     end
 
-    if xemu.and_(input, sm.button_A) ~= 0 then
+    if (input & sm.button_A) ~= 0 then
         -- These move the Samus around
-        samusXPosition = xemu.and_(samusXPosition +             xemu.and_(changedInput, sm.button_right),    0xFFFF)
-        samusXPosition = xemu.and_(samusXPosition - xemu.rshift(xemu.and_(changedInput, sm.button_left), 1), 0xFFFF)
-        samusYPosition = xemu.and_(samusYPosition + xemu.rshift(xemu.and_(changedInput, sm.button_down), 2), 0xFFFF)
-        samusYPosition = xemu.and_(samusYPosition - xemu.rshift(xemu.and_(changedInput, sm.button_up),   3), 0xFFFF)
+        samusXPosition = (samusXPosition +  (changedInput & sm.button_right)      & 0xFFFF)
+        samusXPosition = (samusXPosition - ((changedInput & sm.button_left) >> 1) & 0xFFFF)
+        samusYPosition = (samusYPosition + ((changedInput & sm.button_down) >> 2) & 0xFFFF)
+        samusYPosition = (samusYPosition - ((changedInput & sm.button_up)   >> 3) & 0xFFFF)
         sm.setSamusXPosition(samusXPosition)
         sm.setSamusYPosition(samusYPosition)
     else
         -- These move the camera around
-        xAdjust = xAdjust + xemu.rshift(xemu.and_(changedInput, sm.button_right), 8) * 256
-        xAdjust = xAdjust - xemu.rshift(xemu.and_(changedInput, sm.button_left),  9) * 256
-        yAdjust = yAdjust + xemu.rshift(xemu.and_(changedInput, sm.button_down), 10) * 224
-        yAdjust = yAdjust - xemu.rshift(xemu.and_(changedInput, sm.button_up),   11) * 224
+        xAdjust = xAdjust + ((changedInput & sm.button_right) >>  8) * 256
+        xAdjust = xAdjust - ((changedInput & sm.button_left)  >>  9) * 256
+        yAdjust = yAdjust + ((changedInput & sm.button_down)  >> 10) * 224
+        yAdjust = yAdjust - ((changedInput & sm.button_up)    >> 11) * 224
     end
 end
 
-function displayScrollBoundaries(cameraX, cameraY, roomWidth)
-    for y = -yExtraScrolls, yExtraScrolls + 1 do
-        for x = -xExtraScrolls, xExtraScrolls + 1 do
-            local scrollX = x * 0x100 - xemu.and_(cameraX, 0xFF)
-            local scrollY = y * 0x100 - xemu.and_(cameraY, 0xFF)
-
-            local scroll = sm.getScroll((xemu.rshift(cameraY + y * 0x100, 8)) * xemu.rshift(roomWidth, 4) + xemu.rshift(cameraX + x * 0x100, 8))
-
-            local colour = colour_scroll_red
-            if scroll == 1 then
-                colour = colour_scroll_blue
-            elseif scroll == 2 then
-                colour = colour_scroll_green
-            end
-
-            drawBox(scrollX, scrollY, scrollX + 0xFF, scrollY + 0xFF, colour)
-            --drawBox(scrollX, scrollY, scrollX + 0xFF, scrollY + 0xFF, colour, colour)
-        end
-    end
-end
-
-function displayCameraMargin()
+local function displayCameraMargin()
     local cameraDistanceIndex = sm.getCameraDistanceIndex()
 
     local top = sm.getUpScroller()
@@ -385,29 +459,30 @@ function displayCameraMargin()
     local left = xemu.read_u16_le(0x90963F + cameraDistanceIndex)
     local right = xemu.read_u16_le(0x909647 + cameraDistanceIndex)
 
-    drawBox(left, top, right, bottom, colour_camera)
+    gui.drawBox(left, top, right, bottom, colour_camera)
 end
 
-function displayBlocks(cameraX, cameraY, roomWidth)
-    for y = -yExtraBlocks,14 + yExtraBlocks do
-        for x = -xExtraBlocks,16 + xExtraBlocks do
+local function displayBlocks(cameraX, cameraY, roomWidth)
+    for y = 0,14 do
+        for x = 0,16 do
             -- Impose a limit on the number of block extensions allowed, otherwise infinite loops can occur
             local stackLimit = 224
 
             -- Align block outlines graphically
-            local blockX = x * 0x10 - xemu.and_(cameraX, 0xF)
-            local blockY = y * 0x10 - xemu.and_(cameraY, 0xF)
+            local blockX = x * 0x10 - (cameraX & 0xF)
+            local blockY = y * 0x10 - (cameraY & 0xF)
 
             -- Blocks are 16x16 px², using a right shift to avoid dealing with floats
-            local blockIndex = xemu.rshift(xemu.and_(cameraY + y * 0x10, 0xFFF), 4) * roomWidth
-                             + xemu.rshift(xemu.and_(cameraX + x * 0x10, 0xFFFF), 4)
+            local blockIndex = (((cameraY + y * 0x10) & 0xFFF) >> 4) * roomWidth
+                             + (((cameraX + x * 0x10) & 0xFFFF) >> 4)
 
             -- Block type is the most significant 4 bits of level data
-            local blockType = xemu.rshift(sm.getLevelDatum(blockIndex), 12)
+            local blockType = (sm.getLevelDatum(blockIndex) >> 12)
             if debugFlag ~= 0 or blockType == 6 then
                 -- Show the block type and BTS of every block
-                drawText(blockX + 4, blockY, string.format("%02X", blockType), "red")
-                drawText(blockX + 4, blockY + 8, string.format("%02X", sm.getBts(blockIndex)), "red")
+                local textpos = client.transformPoint(blockX + 4, blockY)
+                gui.text(textpos.x, textpos.y, string.format("$%02X", blockType), 0xFFFF0000)
+                gui.text(textpos.x, textpos.y + 16, string.format("$%02X", sm.getBts(blockIndex)), 0xFFFF0000)
             end
 
             -- Draw the block outline depending on its block type
@@ -417,17 +492,17 @@ function displayBlocks(cameraX, cameraY, roomWidth)
     end
 end
 
-function displayDebugInfo(cameraX, cameraY, roomWidth)
+local function displayDebugInfo(cameraX, cameraY, roomWidth)
     if debugInfoFlag == 0 then
         return
     end
 
-    local cameraXBlock = xemu.rshift(cameraX, 4)
-    local cameraYBlock = xemu.rshift(xemu.and_(cameraY, 0xFFF), 4)
-    local clip = 0x7F0000 + xemu.and_(2 + (cameraXBlock + cameraYBlock * roomWidth) * 2, 0xFFFF)
+    local cameraXBlock = (cameraX >> 4)
+    local cameraYBlock = ((cameraY & 0xFFF) >> 4)
+    local clip = 0x7F0000 + ((2 + (cameraXBlock + cameraYBlock * roomWidth) * 2) & 0xFFFF)
     local clip_end = 0x7F0002 + 0x1FE * roomWidth + 0x1FFE
     local bts_end = 0x7F6402 + roomWidth * sm.getRoomHeight()
-    drawText(0, 0, string.format("cameraX: %03X\ncameraY: %03X\nClip: %X\nClip end: %X\nBTS end: %X", cameraXBlock, cameraYBlock, clip, clip_end, bts_end), "cyan")
+    gui.text(0, 0, string.format("cameraX: %03X\ncameraY: %03X\nClip: %X\nClip end: %X\nBTS end: %X", cameraXBlock, cameraYBlock, clip, clip_end, bts_end), "cyan")
 
     if debugFlag == 0 then
         return
@@ -435,9 +510,9 @@ function displayDebugInfo(cameraX, cameraY, roomWidth)
 
     if doorListFlag ~= 0 then
         p_doorList = sm.getDoorListPointer()
-        for i = 0,xemu.rshift(clip_end - 0x7F0002, 1) do
-            if xemu.and_(sm.getLevelDatum(i), 0xF000) == 0x9000 then
-                bts = xemu.and_(sm.getBts(i), 0x7F)
+        for i = 0,((clip_end - 0x7F0002) << 1) do
+            if (sm.getLevelDatum(i) & 0xF000) == 0x9000 then
+                bts = (sm.getBts(i) & 0x7F)
                 if doors[xemu.read_u16_le(0x8F0000 + p_doorList + bts * 2)] then
                     doorList[bts] = doorList[bts] + 1
                 end
@@ -450,22 +525,23 @@ function displayDebugInfo(cameraX, cameraY, roomWidth)
     for j = 0,0x7F do
         i = 0x7F - j
         if doorList[i] ~= 0 then
-            drawText(0, y, string.format("%02X x %i", i, doorList[i]), "cyan")
+            --gui.text(0, y, string.format("%02X x %i", i, doorList[i]), "cyan")
+            print("door:", i, doorList[i])
             y = y - 8
         end
     end
 end
 
-function displayFx(cameraX, cameraY)
+local function displayFx(cameraX, cameraY)
     local fxY = sm.getFxYPosition() - cameraY
     local lavaAcidY = sm.getLavaAcidYPosition() - cameraY
     local fxTargetY = sm.getFxTargetYPosition() - cameraY
-    drawLine(0, fxY, 255, fxY, 0x004080FF)
-    drawLine(0, lavaAcidY, 255, lavaAcidY, 0xFFC080FF)
-    drawLine(0, fxTargetY, 255, fxTargetY, 0xFFFFFFFF)
+    gui.drawLine(0, fxY, 255, fxY, 0xFF004080)
+    gui.drawLine(0, lavaAcidY, 255, lavaAcidY, 0xFFFFC080)
+    gui.drawLine(0, fxTargetY, 255, fxTargetY, 0xFFFFFFFF)
 end
 
-function displayKraidHitbox(cameraX, cameraY)
+local function displayKraidHitbox(cameraX, cameraY)
     if sm.getEnemyId(0) ~= 0xE2BF then
         return
     end
@@ -483,7 +559,7 @@ function displayKraidHitbox(cameraX, cameraY)
         local left   = kraidXPosition + kraidLeftOffset   - cameraX
         local top    = kraidYPosition + kraidTopOffset    - cameraY
         local bottom = kraidYPosition + kraidBottomOffset - cameraY
-        drawBox(left, top, 256, bottom, 0xFFFFFFFF, "clear")
+        gui.drawBox(left, top, 256, bottom, 0xFFFFFFFF)
     end
 
     -- Invulnerable hitbox for Kraid's mouth
@@ -494,8 +570,8 @@ function displayKraidHitbox(cameraX, cameraY)
     local left   = kraidXPosition + kraidLeftOffset   - cameraX
     local top    = kraidYPosition + kraidTopOffset    - cameraY
     local bottom = kraidYPosition + kraidBottomOffset - cameraY
-    drawLine(left, top, 256, top, 0xFFFF80FF)
-    drawLine(left, top, left, bottom, 0xFFFF80FF)
+    gui.drawLine(left, top, 256, top, 0xFFFFFF80)
+    gui.drawLine(left, top, left, bottom, 0xFFFFFF80)
 
     -- Kraid's body
     local kraidSectionTopOffset = -0x8000
@@ -511,17 +587,17 @@ function displayKraidHitbox(cameraX, cameraY)
 
         -- Projectile hitbox is only defined up to Kraid's head, Samus hitbox uses whole table
         if kraidSectionTopOffset <= kraidBottomOffset then
-            drawLine(left, top, right, top, 0xFF8080FF)
-            drawLine(left, top, left, bottom, 0xFF8080FF)
+            gui.drawLine(left, top, right, top, 0xFFFF8080)
+            gui.drawLine(left, top, left, bottom, 0xFFFF8080)
             local kraidSectionTopOffset    = math.max(kraidSectionTopOffset, kraidBottomOffset)
             local kraidSectionBottomOffset = math.max(kraidSectionBottomOffset, kraidBottomOffset)
             local top    = kraidYPosition + kraidSectionTopOffset    - cameraY
             local bottom = kraidYPosition + kraidSectionBottomOffset - cameraY
-            drawLine(left, top, right, top, 0xFFFF80FF)
-            drawLine(left, top, left, bottom, 0xFFFFC0C0)
+            gui.drawLine(left, top, right, top, 0xFFFFFF80)
+            gui.drawLine(left, top, left, bottom, 0xC0FFFFC0)
         else
-            drawLine(left, top, right, top, 0xFFFFC0C0)
-            drawLine(left, top, left, bottom, 0xFFFFC0C0)
+            gui.drawLine(left, top, right, top, 0xC0FFFFC0)
+            gui.drawLine(left, top, left, bottom, 0xC0FFFFC0)
         end
 
         kraidSectionTopOffset   = kraidSectionBottomOffset
@@ -529,7 +605,7 @@ function displayKraidHitbox(cameraX, cameraY)
     end
 end
 
-function displayMotherBrainHitbox(cameraX, cameraY)
+local function displayMotherBrainHitbox(cameraX, cameraY)
     if sm.getEnemyId(0) ~= 0xEC7F then
         return
     end
@@ -540,7 +616,7 @@ function displayMotherBrainHitbox(cameraX, cameraY)
 
     local motherBrainHitboxFlags = xemu.read_u16_le(0x7E7808)
 
-    if xemu.and_(motherBrainHitboxFlags, 1) ~= 0 then
+    if (motherBrainHitboxFlags & 1) ~= 0 then
         local xPosition = sm.getEnemyXPosition(0)
         local yPosition = sm.getEnemyYPosition(0)
         local n_hitboxes = xemu.read_u16_le(p_motherBrainBodyHitbox)
@@ -554,11 +630,11 @@ function displayMotherBrainHitbox(cameraX, cameraY)
             local top    = yPosition - topOffset    - cameraY
             local right  = xPosition + rightOffset  - cameraX
             local bottom = yPosition + bottomOffset - cameraY
-            drawBox(left, top, right, bottom, "green")
+            gui.drawBox(left, top, right, bottom, 0xFF00FF00)
         end
     end
 
-    if xemu.and_(motherBrainHitboxFlags, 2) ~= 0 then
+    if (motherBrainHitboxFlags & 2) ~= 0 then
         local xPosition = sm.getEnemyXPosition(1)
         local yPosition = sm.getEnemyYPosition(1)
         local n_hitboxes = xemu.read_u16_le(p_motherBrainBrainHitbox)
@@ -572,11 +648,11 @@ function displayMotherBrainHitbox(cameraX, cameraY)
             local top    = yPosition - topOffset    - cameraY
             local right  = xPosition + rightOffset  - cameraX
             local bottom = yPosition + bottomOffset - cameraY
-            drawBox(left, top, right, bottom, "blue")
+            gui.drawBox(left, top, right, bottom, 0xFF0000FF)
         end
     end
 
-    if xemu.and_(motherBrainHitboxFlags, 4) ~= 0 then
+    if (motherBrainHitboxFlags & 4) ~= 0 then
         local n_hitboxes = xemu.read_u16_le(p_motherBrainNeckHitbox)
         local p_hitboxes = p_motherBrainNeckHitbox + 2
         for i = 1,3 do
@@ -591,7 +667,7 @@ function displayMotherBrainHitbox(cameraX, cameraY)
                 local top    = yPosition - topOffset    - cameraY
                 local right  = xPosition + rightOffset  - cameraX
                 local bottom = yPosition + bottomOffset - cameraY
-                drawBox(left, top, right, bottom, "cyan")
+                gui.drawBox(left, top, right, bottom, "cyan")
             end
         end
     end
@@ -605,7 +681,7 @@ function displayMotherBrainHitbox(cameraX, cameraY)
     --drawRightTriangle(xPositionBody, yPositionBody, x, y, "yellow")
 end
 
-function displayEnemyHitboxes(cameraX, cameraY)
+local function displayEnemyHitboxes(cameraX, cameraY)
     local y = 0
     local n_enemies = sm.getNEnemies()
     --drawText(0, 0, string.format("n_enemies: %04X", n_enemies), 0xFF00FFFF)
@@ -629,13 +705,13 @@ function displayEnemyHitboxes(cameraX, cameraY)
 
             -- Draw enemy hitbox
             -- If not using extended spritemap format or frozen, draw simple hitbox
-            if xemu.and_(sm.getEnemyExtraProperties(i), 4) == 0 or sm.getEnemyAiHandler(i) == 4 then
-                drawBox(left, top, right, bottom, colour_enemy, "clear")
+            if (sm.getEnemyExtraProperties(i) & 4) == 0 or sm.getEnemyAiHandler(i) == 4 then
+                gui.drawBox(left, top, right, bottom, colour_enemy)
             else
                 -- Process extended spritemap format
                 local p_spritemap = sm.getEnemySpritemap(i)
                 if p_spritemap ~= 0 then
-                    local bank = xemu.lshift(sm.getEnemyBank(i), 16)
+                    local bank = (sm.getEnemyBank(i) << 16)
                     p_spritemap = bank + p_spritemap
                     local n_spritemap = xemu.read_u8(p_spritemap)
                     if n_spritemap ~= 0 then
@@ -653,13 +729,12 @@ function displayEnemyHitboxes(cameraX, cameraY)
                                         local entryTop    = xemu.read_s16_le(entryHitboxPointer + 2 + iii*12 + 2)
                                         local entryRight  = xemu.read_s16_le(entryHitboxPointer + 2 + iii*12 + 4)
                                         local entryBottom = xemu.read_s16_le(entryHitboxPointer + 2 + iii*12 + 6)
-                                        drawBox(
+                                        gui.drawBox(
                                             enemyXPosition - cameraX + entryXOffset + entryLeft,
                                             enemyYPosition - cameraY + entryYOffset + entryTop,
                                             enemyXPosition - cameraX + entryXOffset + entryRight,
                                             enemyYPosition - cameraY + entryYOffset + entryBottom,
-                                            colour_enemy, "clear"
-                                        )
+                                            colour_enemy)
                                     end
                                 end
                             end
@@ -673,7 +748,7 @@ function displayEnemyHitboxes(cameraX, cameraY)
 
             -- Log enemy index and ID to list in top-right
             if logFlag ~= 0 then
-                drawText(224, y, string.format("%u: %04X", i, enemyId), colour_enemy, 0xFF)
+                gui.text(224, y, string.format("%u: %04X", i, enemyId), colour_enemy)
                 --drawText(192, y, string.format("%u: %04X", i, sm.getEnemyInstructionList(i)), colour_enemy, 0xFF)
                 --drawText(160, y, string.format("%u: %04X", i, sm.getEnemyAiVariable5(i)), colour_enemy, 0xFF)
                 y = y + 8
@@ -683,18 +758,14 @@ function displayEnemyHitboxes(cameraX, cameraY)
             local enemySpawnHealth = xemu.read_u16_le(0xA00004 + enemyId)
             if enemySpawnHealth ~= 0 then
                 local enemyHealth = sm.getEnemyHealth(i)
-                drawText(left, top - 16, string.format("%u/%u", enemyHealth, enemySpawnHealth), colour_enemy)
-                -- Draw enemy health bar
-                if enemyHealth ~= 0 then
-                    drawBox(left, top - 8, left + enemyHealth * 32 / enemySpawnHealth, top - 5, colour_enemy, colour_enemy)
-                    drawBox(left, top - 8, left + 32, top - 5, colour_enemy, "clear")
-                end
+                local textpos = client.transformPoint(left, top)
+                gui.text(textpos.x, textpos.y - 16, string.format("%u/%u", enemyHealth, enemySpawnHealth), colour_enemy)
             end
         end
     end
 end
 
-function displaySpriteObjects(cameraX, cameraY)
+local function displaySpriteObjects(cameraX, cameraY)
     for j=1,32 do
         -- Iterate backwards, I want earlier sprite objects drawn on top of later ones
         local i = 32 - j
@@ -710,21 +781,21 @@ function displaySpriteObjects(cameraX, cameraY)
             local bottom = spriteObjectYPosition + spriteObjectYRadius - cameraY
 
             -- Draw sprite object
-            drawBox(left, top, right, bottom, colour_spriteObject, "clear")
+            gui.drawBox(left, top, right, bottom, colour_spriteObject)
 
             -- Show sprite object index and ID
             --drawText(left, top, string.format("%u: %04X", i, spriteObjectId), colour_spriteObject, "black")
 
             -- Log sprite object index and ID to list in top-left
             if logFlag ~= 0 then
-                drawText(0, y, string.format("%u: %04X", i, spriteObjectId), colour_spriteObject, "black")
+                gui.text(0, y, string.format("%u: %04X", i, spriteObjectId), colour_spriteObject, 0xFF000000)
                 y = y + 8
             end
         end
     end
 end
 
-function displayEnemyProjectileHitboxes(cameraX, cameraY)
+local function displayEnemyProjectileHitboxes(cameraX, cameraY)
     for j=1,18 do
         -- Iterate backwards, I want earlier enemy projectiles drawn on top of later ones
         local i = 18 - j
@@ -740,8 +811,7 @@ function displayEnemyProjectileHitboxes(cameraX, cameraY)
             local bottom = enemyProjectileYPosition + enemyProjectileYRadius - cameraY
 
             -- Draw enemy projectile hitbox
-            drawBox(left, top, right, bottom, colour_enemyProjectile, "clear")
-            --drawBox(math.min(left, right - 2), math.min(top, bottom - 2), math.max(right, left + 2), math.max(bottom, top + 2), colour_enemyProjectile, "clear")
+            gui.drawBox(left, top, right, bottom, colour_enemyProjectile)
 
             if enemyProjectileId == 0xDE88 then
             -- Show enemy projectile index and ID
@@ -749,7 +819,7 @@ function displayEnemyProjectileHitboxes(cameraX, cameraY)
 
             -- Log enemy projectile index and ID to list in top-right (after sprite objects)
             if logFlag ~= 0 then
-                drawText(0, y, string.format("%u: %04X", i, xemu.read_u16_le(0x7E1B23 + i * 2)), colour_enemyProjectile)
+                gui.text(0, y, string.format("%u: %04X", i, xemu.read_u16_le(0x7E1B23 + i * 2)), colour_enemyProjectile)
                 y = y + 8
             end
             end
@@ -757,7 +827,7 @@ function displayEnemyProjectileHitboxes(cameraX, cameraY)
     end
 end
 
-function displayPowerBombExplosionHitbox(cameraX, cameraY)
+local function displayPowerBombExplosionHitbox(cameraX, cameraY)
     if sm.getPowerBombFlag() == 0 then
         return
     end
@@ -772,10 +842,10 @@ function displayPowerBombExplosionHitbox(cameraX, cameraY)
     local bottom = powerBombYPosition + powerBombYRadius - cameraY
 
     -- Draw power bomb hitbox
-    drawBox(left, top, right, bottom, colour_powerBomb, "clear")
+    gui.drawBox(left, top, right, bottom, colour_powerBomb)
 end
 
-function displayProjectileHitboxes(cameraX, cameraY)
+local function displayProjectileHitboxes(cameraX, cameraY)
     for i=0,9 do
         local projectileXPosition = sm.getProjectileXPosition(i)
         local projectileYPosition = sm.getProjectileYPosition(i)
@@ -786,30 +856,35 @@ function displayProjectileHitboxes(cameraX, cameraY)
         local right  = projectileXPosition + projectileXRadius - cameraX
         local bottom = projectileYPosition + projectileYRadius - cameraY
 
-        -- Draw projectile hitbox
-        drawBox(left, top, right, bottom, colour_projectile, "clear")
+        if projectileXRadius ~= 0 or projectileYRadius ~= 0 or
+            projectileXPosition ~= 0 or projectileYPosition ~= 0
+        then
+            -- Draw projectile hitbox
+            gui.drawBox(left, top, right, bottom, colour_projectile)
+        end
 
         if sm.getBombTimer(i) ~= 0 then
             -- Show projectile damage
-            drawText(left, top - 8, sm.getProjectileDamage(i), colour_projectile)
+            local textpos = client.transformPoint(left, top)
+            --gui.text(textpos.x, textpos.y - 32, sm.getProjectileDamage(i), colour_projectile)
 
             -- Show bomb timer
             if i >= 5 then
-                drawText(left, top - 16, sm.getBombTimer(i), colour_projectile)
+                gui.text(textpos.x, textpos.y - 16, sm.getBombTimer(i), colour_projectile)
             else
-                drawText(left, top - 16, string.format("%04X", sm.getBombTimer(i)), colour_projectile)
+                gui.text(textpos.x, textpos.y - 16, string.format("%04X", sm.getBombTimer(i)), colour_projectile)
             end
         end
     end
 end
 
-function displaySamusHitbox(cameraX, cameraY, samusXPosition, samusYPosition)
+local function displaySamusHitbox(cameraX, cameraY, samusXPosition, samusYPosition)
     local samusXSubposition = sm.getSamusXSubposition()
     local samusYSubposition = sm.getSamusYSubposition()
     local samusXSpeed = sm.getSamusXSpeed()
-    --local samusYSpeed = sm.getSamusYSpeed()
+    local samusYSpeed = sm.getSamusYSpeed()
     local samusXSubspeed = sm.getSamusXSubspeed()
-    --local samusYSubspeed = sm.getSamusYSubspeed()
+    local samusYSubspeed = sm.getSamusYSubspeed()
     local samusXMomentum = sm.getSamusXMomentum()
     local samusXSubmomentum = sm.getSamusXSubmomentum()
 
@@ -852,56 +927,62 @@ function displaySamusHitbox(cameraX, cameraY, samusXPosition, samusYPosition)
     end
 
     -- Draw Samus' hitbox
-    drawBox(left, top, right, bottom, colour, "clear")
+    gui.drawBox(left, top, right, bottom, colour)
 
     -- Draw wall jump line
     local pose = sm.getSamusPose()
     local input = sm.getInput()
     local isSpinningRight = pose == 0x19
     local isSpinningLeft = pose == 0x1A
-    local isPressingRight = xemu.and_(input, sm.button_right)
-    local isPressingLeft = xemu.and_(input, sm.button_left)
+    local isPressingRight = (input & sm.button_right)
+    local isPressingLeft = (input & sm.button_left)
     if isSpinningRight and isPressingRight then
-        drawLine(left - 8, top, left - 8, bottom, colour_walljump)
+        gui.drawLine(left - 8, top, left - 8, bottom, colour_walljump)
     elseif isSpinningLeft and isPressingLeft or isSpinningRight and isPressingLeft and isPressingRight then
-        drawLine(right + 8, top, right + 8, bottom, colour_walljump)
+        gui.drawLine(right + 8, top, right + 8, bottom, colour_walljump)
     end
 
     -- Show current cooldown time
     local cooldown = sm.getCooldownTimer()
     if cooldown ~= 0 then
-        drawText(right, (top + bottom) / 2 - 16, cooldown, colour)
+        gui.text(infohudCol2, infohudRow2, string.format("Beam CD: %4d", cooldown))
     end
 
     -- Show current beam charge
     local charge = sm.getChargeCounter()
     if charge ~= 0 then
-        drawText(right, (top + bottom) / 2 - 8, charge, colour)
+        gui.text(infohudCol2, infohudRow3, string.format("Charge: %5d", charge))
     end
 
     -- Show recoil/invincibility
     local invincibility = sm.getInvincibilityTimer()
     local recoil = sm.getRecoilTimer()
     if recoil ~= 0 then
-        drawText(right, (top + bottom) / 2, recoil, colour)
+        gui.text(infohudCol2, infohudRow4, string.format("Knockback: %2d", recoil), 0xFFFFFF00)
     elseif invincibility ~= 0 then
-        drawText(right, (top + bottom) / 2, invincibility, colour)
+        gui.text(infohudCol2, infohudRow4, string.format("I. frames: %2d", invincibility))
+    end
+
+    -- Show speedbooster level
+    local speedLvl = sm.getSpeedBoosterLevel() & 0xff
+    if speedLvl ~= 0 then
+        gui.text(infohudCol2, infohudRow5, string.format("Speed lvl: %d", speedLvl))
     end
 
     -- Show shinespark timer
     local shine = sm.getShinesparkTimer()
     if shine ~= 0 then
-        drawText(right, (top + bottom) / 2 + 8, shine, colour)
+        gui.text(infohudCol2, infohudRow6, string.format("Spark in: %3d", shine))
     end
 
     -- Show X distance
     if samusXPosition32 ~= previousSamusXPosition32 then
-        local direction = '->'
+        local direction = '>'
         if samusXPosition32 < previousSamusXPosition32 then
-            direction = '<-'
+            direction = '<'
         end
 
-        drawText(10, 100, string.format("X:%s: %3d.%05d", direction, xemu.rshift(xDistance_actual, 0x10), xemu.and_(xDistance_actual, 0xFFFF)), colour)
+        gui.text(infohudCol1, infohudRow2, string.format("dx: %s%4d.%05d", direction, (xDistance_actual >> 0x10), (xDistance_actual & 0xFFFF)))
     end
 
     -- Show Y distance
@@ -911,12 +992,48 @@ function displaySamusHitbox(cameraX, cameraY, samusXPosition, samusYPosition)
             direction = '^'
         end
 
-        drawText(10, 110, string.format("Y: %s: %3d.%05d", direction, xemu.rshift(yDistance, 0x10), xemu.and_(yDistance, 0xFFFF)), colour)
+        gui.text(infohudCol1, infohudRow3, string.format("dy: %s%4d.%05d", direction, (yDistance >> 0x10), (yDistance & 0xFFFF)))
     end
 
+    -- Show dash value
+    if samusXSubmomentum ~= 0 or samusXMomentum ~= 0 then
+        gui.text(infohudCol1, infohudRow4, string.format("Dash: %3d.%05d", samusXMomentum, samusXSubmomentum))
+    end
+
+    -- position
+    gui.text(infohudCol1, infohudRow5, string.format("x: %6d.%05d", samusXPosition, samusXSubposition))
+    gui.text(infohudCol1, infohudRow6, string.format("y: %6d.%05d", samusYPosition, samusYSubposition))
+
+    -- speed
+    local xDir = sm.getSamusFacingDirection()
+    if xDir == 4 then
+        xDir = '<'
+    elseif xDir == 8 then
+        xDir = '>'
+    else
+        xDir = '?'
+    end
+    gui.text(infohudCol1, infohudRow7, string.format("vx: %s %3d.%05d", xDir, samusXSpeed, samusXSubspeed))
+
+    local yDir = sm.getSamusYDirection()
+    if yDir == 0 then
+        yDir = '-'
+    elseif yDir == 1 then
+        yDir = '^'
+    elseif yDir == 2 then
+        yDir = 'v'
+    else
+        yDir = '?'
+    end
+    gui.text(infohudCol1, infohudRow8, string.format("vy: %s %3d.%05d", yDir, samusYSpeed, samusYSubspeed))
+
+    -- Show current pose
+    local pose = sm.getSamusPose()
+    local poseName = sm.poses[pose] or "???"
+    gui.text(infohudCol2, infohudRow1, string.format("Pose: $%02X \"%s\"", pose, poseName))
 end
 
-function displayItemPercentage()
+local function displayItemPercentage()
     local collectedItems = sm.getCollectedItems()
     local collectedBeams = sm.getCollectedBeams()
     local percent = 0
@@ -925,30 +1042,30 @@ function displayItemPercentage()
     percent = percent + math.floor(sm.getSamusMaxMissiles() / 5)
     percent = percent + math.floor(sm.getSamusMaxSuperMissiles() / 5)
     percent = percent + math.floor(sm.getSamusMaxPowerBombs() / 5)
-    percent = percent + xemu.and_(collectedItems, 1) -- varia suit
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 1), 1) -- spring ball
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 2), 1) -- morph ball
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 3), 1) -- screw attack
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 5), 1) -- gravity suit
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 8), 1) -- hi-jump boots
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 9), 1) -- space jump
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 0xC), 1) -- bombs
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 0xD), 1) -- speed booster
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 0xE), 1) -- grapple
-    percent = percent + xemu.and_(xemu.rshift(collectedItems, 0xF), 1) -- x-ray
-    percent = percent + xemu.and_(collectedBeams, 1) -- wave beam
-    percent = percent + xemu.and_(xemu.rshift(collectedBeams, 1), 1) -- ice beam
-    percent = percent + xemu.and_(xemu.rshift(collectedBeams, 2), 1) -- spazer beam
-    percent = percent + xemu.and_(xemu.rshift(collectedBeams, 3), 1) -- plasma beam
-    percent = percent + xemu.and_(xemu.rshift(collectedBeams, 0xC), 1) -- charge beam
+    percent = percent + (collectedItems & 1) -- varia suit
+    percent = percent + ((collectedItems >> 1) & 1) -- spring ball
+    percent = percent + ((collectedItems >> 2) & 1) -- morph ball
+    percent = percent + ((collectedItems >> 3) & 1) -- screw attack
+    percent = percent + ((collectedItems >> 5) & 1) -- gravity suit
+    percent = percent + ((collectedItems >> 8) & 1) -- hi-jump boots
+    percent = percent + ((collectedItems >> 9) & 1) -- space jump
+    percent = percent + ((collectedItems >> 0xC) & 1) -- bombs
+    percent = percent + ((collectedItems >> 0xD) & 1) -- speed booster
+    percent = percent + ((collectedItems >> 0xE) & 1) -- grapple
+    percent = percent + ((collectedItems >> 0xF) & 1) -- x-ray
+    percent = percent + (collectedBeams & 1) -- wave beam
+    percent = percent + ((collectedBeams >> 1) & 1) -- ice beam
+    percent = percent + ((collectedBeams >> 2) & 1) -- spazer beam
+    percent = percent + ((collectedBeams >> 3) & 1) -- plasma beam
+    percent = percent + ((collectedBeams >> 0xC) & 1) -- charge beam
 
-    drawText(20, 160, string.format("Items:  %3d%%", percent));
+    gui.text(infohudCol1, infohudRow1, string.format("Items: %3d%%", percent));
 end
 
-function displayActiveGlitches(samusXPosition, samusYPosition)
+local function displayActiveGlitches(samusXPosition, samusYPosition)
     function slopeKiller()
         local movementType = sm.getSamusMovementType()
-        
+
         local isRelevantMovementType = false
         isRelevantMovementType = isRelevantMovementType or movementType == 0 -- standing
         isRelevantMovementType = isRelevantMovementType or movementType == 1 -- running
@@ -956,124 +1073,124 @@ function displayActiveGlitches(samusXPosition, samusYPosition)
         isRelevantMovementType = isRelevantMovementType or movementType == 0xE -- turning around - on ground
         isRelevantMovementType = isRelevantMovementType or movementType == 0x10 -- moonwalking
         isRelevantMovementType = isRelevantMovementType or movementType == 0x15 -- ran into a wall
-        
+
         local isActive = true
         isActive = isActive and isRelevantMovementType
         isActive = isActive and (sm.getSamusYSpeed() ~= 0 or sm.getSamusYSubspeed() ~= 0)
         isActive = isActive and sm.getSamusPreviousMovementType() ~= 0xF -- crouching/standing/morphing/unmorphing transition
-        
+
         if isActive then
             return ' slopekiller'
         end
-        
+
         return ''
     end
-    
+
     function moonfall()
         local isActive = true
         isActive = isActive and sm.getSamusYDirection() == 0 -- none
         isActive = isActive and (sm.getSamusYSpeed() ~= 0 or sm.getSamusYSubspeed() ~= 0)
         isActive = isActive and sm.getKnockbackDirection() == 0 -- none
-        
+
         if isActive then
             return ' moonfall'
         end
-        
+
         return ''
     end
-    
+
     function flashSuit()
         local shinesparkTimer = sm.getShinesparkTimer()
         local paletteType = sm.getSpecialSamusPaletteType()
-        
+
         if shinesparkTimer == 1 and paletteType == 0 then
             return ' flashsuit'
         elseif shinesparkTimer < 0 and paletteType == 7 then
             return ' cf-flashsuit'
         end
-        
+
         return ''
     end
-    
+
     function xMode()
         local poseInputHandler = sm.getSamusPoseInputHandler()
-        
+
         local isRelevantPoseInputHandler = false
         isRelevantPoseInputHandler = isRelevantPoseInputHandler or poseInputHandler == 0xE913 -- normal
         isRelevantPoseInputHandler = isRelevantPoseInputHandler or poseInputHandler == 0xE926 -- auto-jump hack
         isRelevantPoseInputHandler = isRelevantPoseInputHandler or poseInputHandler == 0xE90E -- rts (shinespark / crystal flash / bomb jump / yapping maw)
-    
+
         local isActive = true
         isActive = isActive and isRelevantPoseInputHandler
         isActive = isActive and sm.getSamusMovementHandler() == 0xA337 -- normal
         isActive = isActive and sm.getFrozenTimeFlag() == 1
-        
+
         if isActive then
             return ' x-mode'
         end
-        
+
         return ''
     end
-    
+
     function gMode()
         local isActive = true
         isActive = isActive and sm.getPlmEnableFlag() == 0
         isActive = isActive and sm.getGameState() < 9
         isActive = isActive and sm.getFrozenTimeFlag() == 9
-        
+
         if isActive then
             return ' g-mode'
         end
-        
+
         return ''
     end
-    
+
     function blueSuit()
         local pose = sm.getSamusPose()
-        
+
         local isActive = true
         isActive = isActive and sm.getSpeedBoosterLevel() == 4
         isActive = isActive and sm.getSamusRunningMomentumFlag() == 0
         isActive = isActive and (pose < 0xC7 or pose >= 0xCF)
-        
+
         if isActive then
             return ' blue suit'
         end
-        
+
         return ''
     end
-    
+
     function oob()
         local gameState = sm.getGameState()
         local elevatorDelayTimer = sm.getDownwardsElevatorDelayTimer()
         local samusXRadius = sm.getSamusXRadius()
         local samusYRadius = sm.getSamusYRadius()
-        
+
         local samusLeft   = samusXPosition - samusXRadius
         local samusRight  = samusXPosition + samusXRadius - 1
         local samusTop    = samusYPosition - samusYRadius
         local samusBottom = samusYPosition + samusYRadius - 1
-        
+
         local isOob = false
         isOob = isOob or samusLeft < 0
         isOob = isOob or samusRight >= sm.getRoomWidth() * 0x10
         isOob = isOob or samusTop < 0
         isOob = isOob or samusBottom >= sm.getRoomHeight() * 0x10
-        
+
         local isActive = true
         isActive = isActive and gameState ~= 9
         isActive = isActive and gameState ~= 0xB
         isActive = isActive and (elevatorDelayTimer == 0 or elevatorDelayTimer == 0xFF)
         isActive = isActive and sm.getElevatorState() == 0
         isActive = isActive and isOob
-        
+
         if isActive then
             return ' oob'
         end
-        
+
         return ''
     end
-    
+
     local activeGlitches = ''
     activeGlitches = activeGlitches .. slopeKiller()
     activeGlitches = activeGlitches .. moonfall()
@@ -1082,18 +1199,18 @@ function displayActiveGlitches(samusXPosition, samusYPosition)
     activeGlitches = activeGlitches .. gMode()
     activeGlitches = activeGlitches .. blueSuit()
     activeGlitches = activeGlitches .. oob()
-    
+
     if activeGlitches ~= '' then
-        drawText(10, 130, 'Active glitches:' .. activeGlitches);
+        gui.text(infohudCol3, infohudRow2, 'Active glitches:' .. activeGlitches);
     end
 end
 
-function displayActiveTricks(samusXPosition, samusYPosition)
+local function displayActiveTricks(samusXPosition, samusYPosition)
     function btSkip()
         local pose = sm.getSamusPose()
         local samusXSubmomentum = sm.getSamusXSubmomentum()
         local doorTimer = sm.getPlmInstructionTimer(0x27)
-        
+
         local isActive = true
         isActive = isActive and sm.getRoomPointer() == 0x9804
         isActive = isActive and sm.getMessageBoxIndex() == 0x13
@@ -1103,24 +1220,34 @@ function displayActiveTricks(samusXPosition, samusYPosition)
         isActive = isActive and sm.getSamusYSpeed() == 1 and sm.getSamusYSubspeed() == 0xDC00
         isActive = isActive and doorTimer == 2
         isActive = isActive and pose ~= 0x19 and pose ~= 0x1A
-        
+
         if isActive then
             return ' btskip'
         end
-        
+
         return ''
     end
-    
+
     local activeTricks = ''
     activeTricks = activeTricks .. btSkip()
-    
+
     if activeTricks ~= '' then
-        drawText(10, 120, 'Active tricks:' .. activeTricks);
+        gui.text(infohudCol3, infohudRow3, 'Active tricks:' .. activeTricks);
     end
 end
 
+local function displaySlopekillerOffset()
+    -- TODO
+end
+
 -- Finally, the main loop
-function on_paint()
+local function on_paint()
+    if client.isseeking() then
+        -- disable script when seeking
+        gui.clearGraphics()
+        return
+    end
+
     if not isValidLevelData() then
         return
     end
@@ -1145,12 +1272,12 @@ function on_paint()
     -- Width of the room in blocks
     local roomWidth = sm.getRoomWidth()
 
-    -- [[
-    displayScrollBoundaries(cameraX, cameraY, roomWidth)
     --displayCameraMargin()
     --displayDebugInfo(cameraX, cameraY, roomWidth)
-    displayBlocks(cameraX, cameraY, roomWidth)
-    displayFx(cameraX, cameraY)
+    if client.ispaused() then
+        displayBlocks(cameraX, cameraY, roomWidth)
+        displayFx(cameraX, cameraY)
+    end
 
     displayKraidHitbox(cameraX, cameraY)
     displayMotherBrainHitbox(cameraX, cameraY)
@@ -1166,7 +1293,7 @@ function on_paint()
     displayItemPercentage()
     displayActiveGlitches(samusXPosition, samusYPosition)
     displayActiveTricks(samusXPosition, samusYPosition)
-    --]]
+    displaySlopekillerOffset()
 
     previousSamusXPosition = samusXPosition
     previousSamusYPosition = samusYPosition
@@ -1174,11 +1301,7 @@ function on_paint()
     previousSamusYSubposition = sm.getSamusYSubposition()
 end
 
-if xemu.emuId == xemu.emuId_mesen then
-    emu.addEventCallback(on_paint, emu.eventType.nmi)
-elseif xemu.emuId ~= xemu.emuId_lsnes then
-    while true do
-        on_paint()
-        emu.frameadvance()
-    end
+while true do
+    on_paint()
+    emu.frameadvance()
 end
