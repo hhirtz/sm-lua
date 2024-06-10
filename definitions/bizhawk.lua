@@ -106,14 +106,22 @@ function gui.drawBox(x1, y1, x2, y2, fg, bg, surfacename) end
 ---@param surfacename? string
 function gui.drawLine(x1, y1, x2, y2, color, surfacename) end
 
----@param x1 integer
----@param y1 integer
+---@param points integer[][]
+---@param offset_x integer
+---@param offset_y integer
+---@param fg? luacolor  something by default
+---@param bg? luacolor  something by default
+---@param surfacename? string
+function gui.drawPolygon(points, offset_x, offset_y, fg, bg, surfacename) end
+
+---@param x integer
+---@param y integer
 ---@param width integer
 ---@param height integer
 ---@param fg? luacolor  something by default
 ---@param bg? luacolor  something by default
 ---@param surfacename? string
-function gui.drawRectangle(x1, y1, width, height, fg, bg, surfacename) end
+function gui.drawRectangle(x, y, width, height, fg, bg, surfacename) end
 
 ---@param x integer
 ---@param y integer
@@ -160,6 +168,12 @@ function mainmemory.read_s16_le(address) end
 
 ---@class (exact) memory
 memory = {}
+
+---@param address integer
+---@param length integer
+---@return integer[]
+---@nodiscard
+function memory.read_bytes_as_array(address, length) end
 
 ---@param address integer
 ---@param domain? string
