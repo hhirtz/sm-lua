@@ -34,12 +34,60 @@ event = {}
 ---@param f fun()
 ---@param name? string
 ---@return string
+function event.onexit(f, name) end
+
+---@param f fun()
+---@param name? string
+---@return string
 function event.onframestart(f, name) end
+
+---@class (exact) LuaCanvas
+LuaCanvas = {}
+
+---@param color luacolor
+function LuaCanvas.Clear(color) end
+
+---@param x1 integer
+---@param y1 integer
+---@param x2 integer
+---@param y2 integer
+---@param fg? luacolor  something by default
+---@param bg? luacolor  something by default
+function LuaCanvas.DrawBox(x1, y1, x2, y2, fg, bg) end
+
+---@param x1 integer
+---@param y1 integer
+---@param x2 integer
+---@param y2 integer
+---@param color? luacolor  black by default
+function LuaCanvas.DrawLine(x1, y1, x2, y2, color) end
+
+---@param x1 integer
+---@param y1 integer
+---@param width integer
+---@param height integer
+---@param fg? luacolor  something by default
+---@param bg? luacolor  something by default
+function LuaCanvas.DrawRectangle(x1, y1, width, height, fg, bg) end
+
+function LuaCanvas.Refresh() end
+
+---@param x integer
+---@param y integer
+function LuaCanvas.SetLocation(x, y) end
 
 ---@class (exact) gui
 gui = {}
 
 function gui.clearGraphics() end
+
+function gui.cleartext() end
+
+---@param width integer
+---@param height integer
+---@return LuaCanvas
+---@nodiscard
+function gui.createcanvas(width, height) end
 
 ---@param x1 integer
 ---@param y1 integer
@@ -86,7 +134,7 @@ mainmemory = {}
 
 ---@param address integer
 ---@param length integer
----@return table<integer, integer>
+---@return integer[]
 ---@nodiscard
 function mainmemory.read_bytes_as_array(address, length) end
 
