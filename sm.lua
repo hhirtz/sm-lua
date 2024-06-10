@@ -406,7 +406,7 @@ local function samus_displacement()
     return samus_dx, samus_dy
 end
 
-local function draw_samus_hitbox(samus_dx, samus_dy)
+local function draw_samus_hitbox()
     -- hitbox around samus
     local x = (SAMUS_X >> 16) - SCREEN_X
     local y = (SAMUS_Y >> 16) - SCREEN_Y
@@ -416,9 +416,27 @@ local function draw_samus_hitbox(samus_dx, samus_dy)
     local y2 = y + SAMUS_RADIUS_Y
     gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
-    -- speed expectation
-    -- TODO don't show when grapple
-    local textpos = client.transformPoint(x1, y1)
+    -- walljump lines
+    local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x81)
+    local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x82)
+    local pressing_right = (INPUT & BUTTON_RIGHT) ~= 0
+    local pressing_left = (INPUT & BUTTON_LEFT) ~= 0
+    if (spinning_left and pressing_left) or (spinning_right and pressing_left and pressing_right) then
+        gui.drawLine(x2 + 8, y1, x2 + 8, y2)
+    elseif spinning_right and pressing_right then
+        gui.drawLine(x1 - 8, y1, x1 - 8, y2)
+    end
+end
+
+local function draw_speed_percent(samus_dx, samus_dy)
+    if GRAPPLE_FUNC == 0xC79D then
+        -- swinging with grapple
+        return
+    end
+
+    local x = (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X
+    local y = (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y
+    local textpos = client.transformPoint(x, y)
     local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *0x0B4A
     local dx_ratio = samus_dx / expected_dx * 100
     if dx_ratio == dx_ratio then
@@ -432,17 +450,6 @@ local function draw_samus_hitbox(samus_dx, samus_dy)
         -- dy_ratio is not NaN
         local expected_dy_msg = string.format("dy:%3.0f%%", samus_dy / expected_dy * 100)
         gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
-    end
-
-    -- walljump lines
-    local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x81)
-    local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x82)
-    local pressing_right = (INPUT & BUTTON_RIGHT) ~= 0
-    local pressing_left = (INPUT & BUTTON_LEFT) ~= 0
-    if (spinning_left and pressing_left) or (spinning_right and pressing_left and pressing_right) then
-        gui.drawLine(x2 + 8, y1, x2 + 8, y2)
-    elseif spinning_right and pressing_right then
-        gui.drawLine(x1 - 8, y1, x1 - 8, y2)
     end
 end
 
@@ -518,10 +525,10 @@ local function draw_grapple_throw_speed()
     -- TODO show at the same place as dx/dy when sling
     local textpos = client.transformPoint(
         (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X,
-        (SAMUS_Y >> 16) - SCREEN_Y + SAMUS_RADIUS_Y + 1)
+        (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y)
 
     local text_x = string.format(">%3d.%05d", speed_x >> 16, speed_x & 0xFFFF)
-    gui.text(textpos.x, textpos.y, text_x)
+    gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, text_x)
 
     local text_y
     if going_up then
@@ -529,7 +536,7 @@ local function draw_grapple_throw_speed()
     else
         text_y = string.format("v%3d.%05d", speed_y >> 16, speed_y & 0xFFFF)
     end
-    gui.text(textpos.x, textpos.y + GUI_FONT_SIZE, text_y)
+    gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, text_y)
 end
 
 local function draw_enemy_hitboxes()
@@ -818,7 +825,8 @@ while true do
 
     if gameplay() then
         local samus_dx, samus_dy = samus_displacement()
-        draw_samus_hitbox(samus_dx, samus_dy)
+        draw_samus_hitbox()
+        draw_speed_percent(samus_dx, samus_dy)
         draw_projectile_hitboxes()
         draw_powerbomb_hitbox()
         draw_grapple_throw_speed()
