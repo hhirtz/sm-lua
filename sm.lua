@@ -1,4 +1,21 @@
 -----------------------------
+-- Super Metroid TAS script for Bizhawk 2.9
+--
+-- Features:
+--  - Hitbox around samus, enemies, projectiles and blocks
+--  - RAM watches
+--  - Armpump and slope speed interference detection
+--  - Grapple swing speed prediction
+--  - Door lag
+--
+-- How to use:
+--
+-- TODO usage notes...
+--
+-- Dev notes:
+--  - lua perf: https://www.lua.org/gems/sample.pdf
+
+-----------------------------
 -- script settings
 local GUI_FONT_SIZE = 16
 local HUD_COLOR_LO = 0xA0FFFFFF
@@ -16,6 +33,11 @@ local HUD_ROW_4 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 4)
 local HUD_ROW_5 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 5)
 local HUD_ROW_6 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 6)
 local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
+local TILE_COLOR_DOORCAP = 0xFFFF8000
+local TILE_COLOR_ERROR = 0xFFFF0000
+local TILE_COLOR_SLOPE = 0xA0FFFFFF
+local TILE_COLOR_SOLID = 0xA0FFFFFF
+local TILE_COLOR_SPECIAL = 0xFF0000FF
 
 
 -----------------------------
@@ -261,6 +283,9 @@ local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
+local ROOM_POINTER = 0
+local ROOM_WIDTH = 0
+local ROOM_HEIGHT = 0
 local SAMUS_X = 0
 local OLD_SAMUS_X = 0
 local SAMUS_Y = 0
@@ -293,6 +318,12 @@ local ENEMY_PROJECTILE_XS = {}
 local ENEMY_PROJECTILE_YS = {}
 local ENEMY_PROJECTILE_RADIUSES = {}
 
+-- These are only initialized when first entering a room,
+-- to generate hitboxes for the tiles in the room
+local SLOPE_DATA = {}
+local BLOCK_DATA = {}
+local BLOCK_BTS = {}
+
 
 -----------------------------
 -- other frame constants
@@ -301,7 +332,60 @@ local SEEKED = true
 
 
 -----------------------------
+-- developpement helpers
+
+-- This counts max, mean and variance of a series of values over time
+-- used for profiling
+local function Stats_new()
+    return { count = 0, mean = 0.0, mean2 = 0.0, min = 1 / 0, max = -1 / 0 }
+end
+
+local function Stats_push(stats, value)
+    if value < stats.min then
+        stats.min = value
+    end
+    if stats.max < value then
+        stats.max = value
+    end
+    -- Ref: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+    stats.count = stats.count + 1
+    local delta = value - stats.mean
+    stats.mean = stats.mean + delta / stats.count
+    local delta2 = value - stats.mean
+    stats.mean2 = stats.mean2 + delta * delta2
+end
+
+local function Stats_get(stats)
+    local variance = 0.0
+    if stats.count > 1 then
+        variance = stats.mean2 / (stats.count - 1)
+    end
+    return {
+        count = stats.count,
+        min = stats.min,
+        max = stats.max,
+        mean = stats.mean,
+        variance = variance,
+    }
+end
+
+local function Stats_print_rare(stats)
+    if FRAME_NO % 300 ~= 0 then
+        return
+    end
+    local v = Stats_get(stats)
+    local text = string.format("Stats: count=%d, range=[%f;%f], mean=%f, var=%f",
+        v.count, v.min, v.max, v.mean, v.variance)
+    print(text)
+end
+
+
+-----------------------------
 -- actual code
+
+local function u8_to_s8(n)
+    return (n & 0x7F) - (n & 0x80)
+end
 
 local function read_enemy_data(res)
     local MAX_ENEMIES = 32
@@ -345,6 +429,9 @@ local function read_new_memory()
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
     POWERBOMB_Y = mainmemory.read_u16_le(0x0CE4)
+    ROOM_POINTER = mainmemory.read_u16_le(0x079B)
+    ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
+    ROOM_HEIGHT = mainmemory.read_u16_le(0x07A7)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0X0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0X0B36)
     SAMUS_DASH = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
@@ -387,14 +474,6 @@ local function gameplay()
     -- TODO return false during pause
     return (0x08 <= GAME_STATE and GAME_STATE <= 0x12) or
         GAME_STATE == 0x2A
-end
-
-local function valid_level_data()
-    return (0x08 <= GAME_STATE and GAME_STATE < 0x0B) or
-        (GAME_STATE == 0x0B and DOOR_TRANSITION_FUNC ~= 0xE36E) or
-        (GAME_STATE == 0x0C) or
-        (GAME_STATE == 0x11) or
-        (GAME_STATE == 0x12)
 end
 
 local function samus_displacement()
@@ -561,6 +640,188 @@ local function draw_enemy_projectile_hitboxes()
             local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
             local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
             gui.drawBox(x1, y1, x2, y2, 0xFFFF8000, 0x35FF8000)
+        end
+    end
+end
+
+local _SIMPLE_OUTLINES = {
+    0x00000000,         -- 0x00: air
+    false,
+    0x00000000,         -- 0x02: spike air
+    TILE_COLOR_SPECIAL, -- 0x03: special air
+    0x00000000,         -- 0x04: shootable air
+    false,
+    0x00000000,         -- 0x06: unused air
+    0x00000000,         -- 0x07: bombable air
+    TILE_COLOR_SOLID,   -- 0x08: solid block
+    TILE_COLOR_SPECIAL, -- 0x09: door block
+    TILE_COLOR_SPECIAL, -- 0x0A: spike block
+    TILE_COLOR_SPECIAL, -- 0x0B: special block
+    false,
+    false,
+    TILE_COLOR_SPECIAL, -- 0x0E: grapple block
+    TILE_COLOR_SPECIAL, -- 0x0F: bombable block
+}
+local _COMPLEX_OUTLINES
+_COMPLEX_OUTLINES = {
+    -- slope
+    -- TODO cache slope polygons
+    [0x01] = function(index, _)
+        local block_bts = BLOCK_BTS[index]
+        local slope_index = block_bts & 0x1F
+        local flip_x = (block_bts & 0x40) ~= 0
+        local flip_y = (block_bts & 0x80) ~= 0
+
+        local ys = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+        for x = 0, 0x0F do
+            local i = x
+            if flip_x then
+                i = 0x0F - x
+            end
+            local y = SLOPE_DATA[(slope_index << 4) + i + 1]
+            if flip_y and y < 0x10 then
+                y = 0x0F - y
+            end
+            ys[x + 1] = y
+        end
+
+        local x_min
+        for x = 1, 0x10 do
+            if ys[x] < 0x10 then
+                x_min = x - 1
+                break
+            end
+        end
+        assert(x_min ~= nil)
+
+        local x_max
+        for x = 0x10, 1, -1 do
+            if ys[x] < 0x10 then
+                x_max = x - 1
+                break
+            end
+        end
+        assert(x_max ~= nil)
+
+        local y_base = 0x0F
+        if flip_y then
+            y_base = 0x00
+        end
+
+        local points = {
+            { x_max, y_base },
+            { x_min, y_base },
+            { x_min, ys[x_min + 1] },
+        }
+
+        for x = x_min + 1, x_max do
+            if ys[x] < 0x10 and ys[x + 1] < 0x10 then
+                points[#points + 1] = { x, ys[x] }
+                if ys[x] ~= ys[x + 1] then
+                    points[#points + 1] = { x, ys[x + 1] }
+                end
+            end
+        end
+
+        return { points = points, color = TILE_COLOR_SLOPE }
+    end,
+
+    -- horizontal extension
+    [0x05] = function(index, stack_limit)
+        if stack_limit == 0 then
+            return TILE_COLOR_ERROR
+        end
+        local block_bts = BLOCK_BTS[index]
+        if block_bts == 0 then
+            -- Infinite recursion, game would probably freeze if this block reacts to anything
+            return TILE_COLOR_ERROR
+        end
+        local extension_index = index + u8_to_s8(block_bts)
+        local block_type = BLOCK_DATA[extension_index << 1] >> 4
+        return _SIMPLE_OUTLINES[block_type + 1] or
+            _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
+    end,
+
+    -- shootable block
+    [0x0C] = function(index, _)
+        local block_bts = BLOCK_BTS[index]
+        if 0x40 <= block_bts and block_bts <= 0x43 then
+            return TILE_COLOR_DOORCAP
+        else
+            return TILE_COLOR_SPECIAL
+        end
+    end,
+
+    -- vertical extension
+    [0x0D] = function(index, stack_limit)
+        if stack_limit == 0 then
+            return TILE_COLOR_ERROR
+        end
+        local block_bts = BLOCK_BTS[index]
+        if block_bts == 0 then
+            -- Infinite recursion, game would probably freeze if this block reacts to anything
+            return TILE_COLOR_ERROR
+        end
+        local extension_index = index + u8_to_s8(block_bts) * ROOM_WIDTH
+        local block_type = BLOCK_DATA[extension_index << 1] >> 4
+        return _SIMPLE_OUTLINES[block_type + 1] or
+            _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
+    end,
+}
+local _block_cache = {} -- TODO clear on ROM change
+local function draw_blocks()
+    local valid_level_data =
+        (0x08 <= GAME_STATE and GAME_STATE < 0x0B) or
+        (GAME_STATE == 0x0B and (DOOR_TRANSITION_FUNC < 0xE2F7 or 0xE36E < DOOR_TRANSITION_FUNC)) or
+        (GAME_STATE == 0x0C) or
+        (GAME_STATE == 0x11) or
+        (GAME_STATE == 0x12)
+    if not valid_level_data then
+        return
+    end
+
+    local blocks = _block_cache[ROOM_POINTER]
+    if not blocks then
+        local statics = {}
+        local dynamics = {}
+
+        SLOPE_DATA = memory.read_bytes_as_array(0x948B2B, 0x1F << 4)
+        BLOCK_DATA = memory.read_bytes_as_array(0x7F0002, (ROOM_WIDTH * ROOM_HEIGHT) << 1)
+        BLOCK_BTS = memory.read_bytes_as_array(0x7F6402, ROOM_WIDTH * ROOM_HEIGHT)
+        for y = 0, ROOM_HEIGHT - 1 do
+            for x = 0, ROOM_WIDTH - 1 do
+                local block_index = y * ROOM_WIDTH + x + 1
+                local block_type = BLOCK_DATA[block_index << 1] >> 4
+                local outline = _SIMPLE_OUTLINES[block_type + 1] or
+                    _COMPLEX_OUTLINES[block_type](block_index, 224)
+                statics[block_index] = outline
+            end
+        end
+
+        blocks = { statics = statics, dynamics = dynamics }
+        _block_cache[ROOM_POINTER] = blocks
+    end
+
+    local statics = blocks.statics          -- \
+    local drawRectangle = gui.drawRectangle -- use locals instead of hash accesses
+    local drawPolygon = gui.drawPolygon     -- /
+    local screen_x_offset = SCREEN_X & 0x0F
+    local screen_y_offset = SCREEN_Y & 0x0F
+    for y = 0, 14 do
+        local block_y = (y << 4) - screen_y_offset
+        local index_offset = ((SCREEN_Y + (y << 4)) >> 4) * ROOM_WIDTH + (SCREEN_X >> 4) + 1
+        for x = 0, 16 do
+            local block_x = (x << 4) - screen_x_offset
+            local block = statics[index_offset + x]
+            if block == nil then
+                -- out of bounds & out of "parallel worlds" => draw nothing
+            elseif type(block) == "number" then
+                if block ~= 0 then
+                    drawRectangle(block_x, block_y, 15, 15, block)
+                end
+            else --type(block) == "table"
+                drawPolygon(block.points, block_x, block_y, block.color)
+            end
         end
     end
 end
@@ -825,6 +1086,7 @@ while true do
     end
 
     if gameplay() then
+        draw_blocks()
         local samus_dx, samus_dy = samus_displacement()
         draw_samus_hitbox()
         draw_speed_percent(samus_dx, samus_dy)
