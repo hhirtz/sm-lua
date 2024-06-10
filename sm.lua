@@ -395,20 +395,8 @@ local function valid_level_data()
 end
 
 local function samus_displacement()
-    local samus_dx
-    if SAMUS_X < OLD_SAMUS_X then
-        samus_dx = OLD_SAMUS_X - SAMUS_X
-    else
-        samus_dx = SAMUS_X - OLD_SAMUS_X
-    end
-
-    local samus_dy
-    if SAMUS_Y < OLD_SAMUS_Y then
-        samus_dy = OLD_SAMUS_Y - SAMUS_Y
-    else
-        samus_dy = SAMUS_Y - OLD_SAMUS_Y
-    end
-
+    local samus_dx = math.abs(SAMUS_X - OLD_SAMUS_X)
+    local samus_dy = math.abs(SAMUS_Y - OLD_SAMUS_Y)
     return samus_dx, samus_dy
 end
 
