@@ -250,6 +250,9 @@ local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
+local GRAPPLE_ANGLE = 0
+local GRAPPLE_FUNC = 0
+local GRAPPLE_SPEED = 0
 local IFRAMES = 0
 local INPUT = 0
 local KNOCKBACK = 0
@@ -332,9 +335,12 @@ local function read_old_memory()
 end
 
 local function read_new_memory()
-    DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
+    DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     GAME_STATE = mainmemory.read_u8(0x0998)
+    GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
+    GRAPPLE_FUNC = mainmemory.read_u16_le(0x0D32)
+    GRAPPLE_SPEED = mainmemory.read_s16_le(0x0D26)
     IFRAMES = mainmemory.read_u16_le(0x18A8)
     INPUT = mainmemory.read_u16_le(0x008B)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
@@ -411,6 +417,7 @@ local function draw_samus_hitbox(samus_dx, samus_dy)
     gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
     -- speed expectation
+    -- TODO don't show when grapple
     local textpos = client.transformPoint(x1, y1)
     local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *0x0B4A
     local dx_ratio = samus_dx / expected_dx * 100
@@ -470,6 +477,59 @@ local function draw_powerbomb_hitbox()
     local x2 = POWERBOMB_X + radius_x - SCREEN_X
     local y2 = POWERBOMB_Y + radius_y - SCREEN_Y
     gui.drawBox(x1, y1, x2, y2, 0xFF00FFFF, 0x35F00FFF)
+end
+
+local function draw_grapple_throw_speed()
+    if GRAPPLE_FUNC ~= 0xC79D then
+        -- not swinging
+        return
+    end
+
+    local function u16_mult(a, y)
+        -- ref: https://patrickjohnston.org/bank/80#f82D6
+        local a_lo = a & 0xFF
+        local a_hi = a >> 8
+        local y_lo = y & 0xFF
+        local y_hi = y >> 8
+
+        -- a*y == a_lo*y_lo + (a_hi*y_lo + a_lo*y_hi)<<8 + (a_hi*y_hi)<<16
+        -- however, the carry from (a_hi*y_lo + a_lo*y_hi) is not propagated to
+        -- the result, thus the "& 0xffff"
+
+        return (a_lo * y_lo) +
+            (((a_hi * y_lo + a_lo * y_hi) & 0xFFFF) << 8) +
+            ((a_hi * y_hi) << 16)
+    end
+
+    -- ref: https://patrickjohnston.org/bank/9B#fCA65
+
+    local rot_speed = math.abs(GRAPPLE_SPEED) << 1
+
+    -- TODO make this a table, maybe
+    local sin_end_angle = memory.read_s16_le(0xA0B443 + (GRAPPLE_ANGLE >> 7))
+
+    local going_up = (sin_end_angle >= 0) ~= (GRAPPLE_SPEED >= 0)
+    local speed_y = u16_mult(rot_speed, math.abs(sin_end_angle)) >> 16
+
+    local x_angle = (GRAPPLE_ANGLE >> 7) - 0x40 + (rot_speed >> 9) * 3
+    local sin_x_angle = memory.read_s16_le(0xA0B443 + x_angle)
+    local speed_x = u16_mult(rot_speed, math.abs(sin_x_angle))
+
+    -- TODO show at the same place as dx/dy when sling
+    local textpos = client.transformPoint(
+        (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X,
+        (SAMUS_Y >> 16) - SCREEN_Y + SAMUS_RADIUS_Y + 1)
+
+    local text_x = string.format(">%3d.%05d", speed_x >> 16, speed_x & 0xFFFF)
+    gui.text(textpos.x, textpos.y, text_x)
+
+    local text_y
+    if going_up then
+        text_y = string.format("^%3d.%05d", speed_y >> 16, speed_y & 0xFFFF)
+    else
+        text_y = string.format("v%3d.%05d", speed_y >> 16, speed_y & 0xFFFF)
+    end
+    gui.text(textpos.x, textpos.y + GUI_FONT_SIZE, text_y)
 end
 
 local function draw_enemy_hitboxes()
@@ -761,6 +821,7 @@ while true do
         draw_samus_hitbox(samus_dx, samus_dy)
         draw_projectile_hitboxes()
         draw_powerbomb_hitbox()
+        draw_grapple_throw_speed()
         draw_enemy_hitboxes()
         draw_enemy_projectile_hitboxes()
         draw_hud(samus_dx, samus_dy)
