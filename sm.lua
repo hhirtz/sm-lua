@@ -812,9 +812,12 @@ event.onexit(function()
     gui.cleartext()
 end)
 while true do
-    emu.frameadvance()
-    gui.clearGraphics()
-    gui.cleartext()
+    repeat
+        emu.frameadvance()
+        gui.clearGraphics()
+        gui.cleartext()
+    until not client.isseeking()
+
     read_new_memory()
 
     do
