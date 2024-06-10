@@ -1,3 +1,4 @@
+-----------------------------
 -- script settings
 local GUI_FONT_SIZE = 16
 local HUD_COLOR_LO = 0xA0FFFFFF
@@ -16,6 +17,8 @@ local HUD_ROW_5 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 5)
 local HUD_ROW_6 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 6)
 local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
 
+
+-----------------------------
 -- databases
 local POSE_NAMES = {
     [0x00] = "Facing forward",
@@ -286,7 +289,12 @@ local BUTTON_SELECT = 1 << 13
 local BUTTON_Y = 1 << 14
 local BUTTON_B = 1 << 15
 
+
+-----------------------------
 -- memory values
+local DOOR_TRANSITION_FUNC = 0
+local OLD_DOOR_TRANSITION_FUNC = 0
+
 local OLD_GAME_STATE = 0
 local GAME_STATE = 0
 
@@ -297,10 +305,13 @@ local OLD_SAMUS_Y = 0
 local SAMUS_Y = 0
 
 local CHARGE_COUNTER = 0
-local DOOR_TRANSITION_FUNC = 0
 local IFRAMES = 0
 local INPUT = 0
 local KNOCKBACK = 0
+local POWERBOMB_RADIUS = 0
+local POWERBOMB_TIMER = 0
+local POWERBOMB_X = 0
+local POWERBOMB_Y = 0
 local SAMUS_DASH = 0
 local SAMUS_DIRECTION_X = 0
 local SAMUS_DIRECTION_Y = 0
@@ -321,23 +332,68 @@ local PROJECTILES_RADIUS_X = {}
 local PROJECTILES_RADIUS_Y = {}
 local BOMB_TIMERS = {}
 
+local ENEMY_COUNT = 0
+local ENEMY_DATA = {}
+local ENEMY_PROJECTILE_IDS = {}
+local ENEMY_PROJECTILE_XS = {}
+local ENEMY_PROJECTILE_YS = {}
+local ENEMY_PROJECTILE_RADIUSES = {}
+
+
+-----------------------------
+-- other frame constants
+local FRAME_NO = 0
+local SEEKED = true
+
+
+-----------------------------
+-- actual code
+
+local function snes2pc(address)
+    return ((address >> 1) & 0x3F8000) | (address & 0x7FFF)
+end
+
+local function read_enemy_data(res)
+    local MAX_ENEMIES = 32
+    local bytes = mainmemory.read_bytes_as_array(0x0F78, 0x40 * MAX_ENEMIES)
+    for i = 1, MAX_ENEMIES do
+        local offset = (i - 1) * 0x40 + 1
+        local id = bytes[offset]| (bytes[offset + 1] << 8)
+        res[i] = {
+            id = id,
+            x = bytes[offset + 2]| (bytes[offset + 3] << 8),
+            -- skip subx
+            y = bytes[offset + 6]| (bytes[offset + 7] << 8),
+            -- skip suby
+            radius_x = bytes[offset + 10]| (bytes[offset + 11] << 8),
+            radius_y = bytes[offset + 12]| (bytes[offset + 13] << 8),
+            health = bytes[offset + 20]| (bytes[offset + 21] << 8),
+            max_health = memory.read_u16_le(snes2pc(0xA00004 + id), "CARTROM"),
+        }
+    end
+end
 
 local function read_old_memory()
+    OLD_DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     OLD_GAME_STATE = mainmemory.read_u8(0x0998)
     OLD_SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
     OLD_SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
 end
 
 local function read_new_memory()
+    DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
     SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
 
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
-    DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     IFRAMES = mainmemory.read_u16_le(0x18A8)
     INPUT = mainmemory.read_u16_le(0x008B)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
+    POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
+    POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
+    POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
+    POWERBOMB_Y = mainmemory.read_u16_le(0x0CE4)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0X0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0X0B36)
     SAMUS_DASH = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
@@ -364,6 +420,14 @@ local function read_new_memory()
     read_u16_le_array(PROJECTILES_RADIUS_X, 0x0BB4, 10)
     read_u16_le_array(PROJECTILES_RADIUS_Y, 0x0BC8, 10)
     read_u16_le_array(BOMB_TIMERS, 0x0C7C, 10)
+
+    ENEMY_COUNT = mainmemory.read_u8(0x0E4E)
+    read_enemy_data(ENEMY_DATA)
+
+    read_u16_le_array(ENEMY_PROJECTILE_IDS, 0x1997, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_XS, 0x1A4B, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_YS, 0x1A93, 18)
+    ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
 end
 
 local function has_level_data()
@@ -428,6 +492,151 @@ local function draw_samus_hitbox(samus_dx)
     elseif spinning_right and pressing_right then
         gui.drawLine(x1 - 8, y1, x1 - 8, y2)
     end
+end
+
+local function draw_projectile_hitboxes()
+    for i = 1, 10 do
+        if PROJECTILES_RADIUS_X[i] ~= 0 or PROJECTILES_RADIUS_Y[i] ~= 0 or BOMB_TIMERS[i] ~= 0 then
+            local x = PROJECTILES_X[i] - SCREEN_X
+            local y = PROJECTILES_Y[i] - SCREEN_Y
+            local x1 = x - PROJECTILES_RADIUS_X[i]
+            local y1 = y - PROJECTILES_RADIUS_Y[i]
+            local x2 = x + PROJECTILES_RADIUS_X[i]
+            local y2 = y + PROJECTILES_RADIUS_Y[i]
+            gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
+
+            if BOMB_TIMERS[i] ~= 0 then
+                local textpos = client.transformPoint(x1, y1)
+                gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, BOMB_TIMERS[i])
+            end
+        end
+    end
+end
+
+local function draw_powerbomb_hitbox()
+    if POWERBOMB_TIMER == 0 then
+        return
+    end
+
+    local radius_x = POWERBOMB_RADIUS >> 8
+    local radius_y = (radius_x * 3) // 4
+    local x1 = POWERBOMB_X - radius_x - SCREEN_X
+    local y1 = POWERBOMB_Y - radius_y - SCREEN_Y
+    local x2 = POWERBOMB_X + radius_x - SCREEN_X
+    local y2 = POWERBOMB_Y + radius_y - SCREEN_Y
+    gui.drawBox(x1, y1, x2, y2, 0xFF00FFFF, 0x35F00FFF)
+end
+
+local function draw_enemy_hitboxes()
+    for i = ENEMY_COUNT, 1, -1 do
+        if ENEMY_DATA[i].id ~= 0 then
+            local x1 = ENEMY_DATA[i].x - ENEMY_DATA[i].radius_x - SCREEN_X
+            local y1 = ENEMY_DATA[i].y - ENEMY_DATA[i].radius_y - SCREEN_Y
+            local x2 = ENEMY_DATA[i].x + ENEMY_DATA[i].radius_x - SCREEN_X
+            local y2 = ENEMY_DATA[i].y + ENEMY_DATA[i].radius_y - SCREEN_Y
+
+            -- TODO extended sprite map
+            gui.drawBox(x1, y1, x2, y2, 0xFFFF0000, 0x35FF0000)
+            local textpos = client.transformPoint(x1, y1)
+            gui.text(textpos.x, textpos.y - GUI_FONT_SIZE,
+                string.format("hp: %d/%d", ENEMY_DATA[i].health, ENEMY_DATA[i].max_health))
+        end
+    end
+end
+
+local function draw_enemy_projectile_hitboxes()
+    for i = 18, 1, -1 do
+        if ENEMY_PROJECTILE_IDS[i] ~= 0 then
+            local x1 = ENEMY_PROJECTILE_XS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
+            local y1 = ENEMY_PROJECTILE_YS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
+            local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
+            local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
+
+            gui.drawBox(x1, y1, x2, y2, 0xFFFF8000, 0x35FF8000)
+            -- TODO show projectile damage?
+        end
+    end
+end
+
+local _dlag_seen_transition_start = false
+local _dlag_seen_transition_end = false
+local _dlag_elevator = 0
+local _dlag_sound = 0
+local _dlag_scroll = 0
+local _dlag_moving_up = 0
+local function draw_door_lag()
+    if SEEKED then
+        _dlag_seen_transition_start = false
+        _dlag_seen_transition_end = false
+        _dlag_elevator = 0
+        _dlag_sound = 0
+        _dlag_scroll = 0
+        _dlag_moving_up = 0
+    end
+
+    if not (0x09 <= GAME_STATE and GAME_STATE <= 0x0B) then
+        -- not in a door transition
+        return
+    end
+
+    if not SEEKED and OLD_GAME_STATE == 0x08 then
+        _dlag_seen_transition_start = true
+        _dlag_seen_transition_end = false
+        _dlag_elevator = 0
+        _dlag_sound = 0
+        _dlag_scroll = 0
+        _dlag_moving_up = 0
+    end
+
+    if GAME_STATE == 0x0B then
+        if DOOR_TRANSITION_FUNC == 0xE17D and OLD_DOOR_TRANSITION_FUNC == 0xE17D then
+            _dlag_elevator = _dlag_elevator + 1
+        elseif DOOR_TRANSITION_FUNC == 0xE29E and OLD_DOOR_TRANSITION_FUNC == 0xE29E then
+            _dlag_sound = _dlag_sound + 1
+        elseif DOOR_TRANSITION_FUNC == 0xE310 and OLD_DOOR_TRANSITION_FUNC == 0xE310 then
+            _dlag_scroll = _dlag_scroll + 1
+        elseif DOOR_TRANSITION_FUNC == 0xE353 and OLD_DOOR_TRANSITION_FUNC == 0xE353 then
+            _dlag_moving_up = _dlag_moving_up + 1
+        elseif DOOR_TRANSITION_FUNC == 0xE36E then
+            _dlag_seen_transition_end = true
+        end
+    end
+
+    local sum = _dlag_scroll + _dlag_sound + _dlag_elevator + _dlag_moving_up
+    local lag_msg
+    if _dlag_seen_transition_start then
+        lag_msg = string.format("Door lag:%3d", sum)
+    else
+        lag_msg = string.format("Door lag >%2d", sum)
+    end
+    local sep = " ("
+    if _dlag_elevator ~= 0 then
+        lag_msg = lag_msg .. sep .. string.format("elevator =%2d", _dlag_elevator)
+        sep = "; "
+    end
+    if _dlag_sound ~= 0 then
+        lag_msg = lag_msg .. sep .. string.format("sound =%2d", _dlag_sound)
+        sep = "; "
+    end
+    if _dlag_scroll ~= 0 then
+        lag_msg = lag_msg .. sep .. string.format("scroll =%2d", _dlag_scroll)
+        sep = "; "
+    end
+    if _dlag_moving_up ~= 0 then
+        lag_msg = lag_msg .. sep .. string.format("fix up =%2d", _dlag_moving_up)
+        sep = "; "
+    end
+    if sep == "; " then
+        sep = ")"
+    else
+        sep = ""
+    end
+    if _dlag_seen_transition_end then
+        lag_msg = lag_msg .. sep .. " (done)"
+    else
+        lag_msg = lag_msg .. sep .. " (in progress)"
+    end
+    gui.text(0, 0, lag_msg, HUD_COLOR_HI, "bottomleft")
 end
 
 local function draw_hud(samus_dx, samus_dy)
@@ -587,37 +796,29 @@ local function draw_hud(samus_dx, samus_dy)
     draw_spark_timer(HUD_COLUMN_1, HUD_ROW_5)
 end
 
-local function draw_projetile_hitboxes()
-    for i = 1, 10 do
-        if PROJECTILES_RADIUS_X[i] ~= 0 or PROJECTILES_RADIUS_Y[i] ~= 0 or BOMB_TIMERS[i] ~= 0 then
-            local x = PROJECTILES_X[i] - SCREEN_X
-            local y = PROJECTILES_Y[i] - SCREEN_Y
-            local x1 = x - PROJECTILES_RADIUS_X[i]
-            local y1 = y - PROJECTILES_RADIUS_Y[i]
-            local x2 = x + PROJECTILES_RADIUS_X[i]
-            local y2 = y + PROJECTILES_RADIUS_Y[i]
-            gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
-
-            if BOMB_TIMERS[i] ~= 0 then
-                local textpos = client.transformPoint(x1, y1)
-                gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, BOMB_TIMERS[i])
-            end
-        end
-    end
-end
-
 event.onframestart(read_old_memory)
 while true do
     emu.frameadvance()
     gui.clearGraphics()
     read_new_memory()
 
+    do
+        local new_frame_no = emu.framecount()
+        SEEKED = new_frame_no ~= FRAME_NO + 1
+        FRAME_NO = new_frame_no
+    end
+
     if has_level_data() then
         local samus_dx, samus_dy = samus_displacement()
-        draw_hud(samus_dx, samus_dy)
         draw_samus_hitbox(samus_dx)
-        draw_projetile_hitboxes()
+        draw_projectile_hitboxes()
+        draw_powerbomb_hitbox()
+        draw_enemy_hitboxes()
+        draw_enemy_projectile_hitboxes()
+        draw_hud(samus_dx, samus_dy)
+        draw_door_lag()
     elseif GAME_STATE == 0x0B then
         draw_hud(0, 0)
+        draw_door_lag()
     end
 end
