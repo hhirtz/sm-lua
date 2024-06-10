@@ -430,7 +430,13 @@ local function read_new_memory()
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
 end
 
-local function has_level_data()
+local function gameplay()
+    -- TODO return false during pause
+    return (0x08 <= GAME_STATE and GAME_STATE <= 0x12) or
+        GAME_STATE == 0x2A
+end
+
+local function valid_level_data()
     return (0x08 <= GAME_STATE and GAME_STATE < 0x0B) or
         (GAME_STATE == 0x0B and DOOR_TRANSITION_FUNC ~= 0xE36E) or
         (GAME_STATE == 0x0C) or
@@ -813,7 +819,7 @@ while true do
         FRAME_NO = new_frame_no
     end
 
-    if has_level_data() then
+    if gameplay() then
         local samus_dx, samus_dy = samus_displacement()
         draw_samus_hitbox(samus_dx)
         draw_projectile_hitboxes()
@@ -821,9 +827,6 @@ while true do
         draw_enemy_hitboxes()
         draw_enemy_projectile_hitboxes()
         draw_hud(samus_dx, samus_dy)
-        draw_door_lag()
-    elseif GAME_STATE == 0x0B then
-        draw_hud(0, 0)
         draw_door_lag()
     end
 end
