@@ -292,19 +292,11 @@ local BUTTON_B = 1 << 15
 
 -----------------------------
 -- memory values
+local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
-
-local OLD_GAME_STATE = 0
 local GAME_STATE = 0
-
-local OLD_SAMUS_X = 0
-local SAMUS_X = 0
-
-local OLD_SAMUS_Y = 0
-local SAMUS_Y = 0
-
-local CHARGE_COUNTER = 0
+local OLD_GAME_STATE = 0
 local IFRAMES = 0
 local INPUT = 0
 local KNOCKBACK = 0
@@ -312,6 +304,10 @@ local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
+local SAMUS_X = 0
+local OLD_SAMUS_X = 0
+local SAMUS_Y = 0
+local OLD_SAMUS_Y = 0
 local SAMUS_DASH = 0
 local SAMUS_DIRECTION_X = 0
 local SAMUS_DIRECTION_Y = 0
@@ -320,6 +316,7 @@ local SAMUS_RADIUS_X = 0
 local SAMUS_RADIUS_Y = 0
 local SAMUS_SPEED_X = 0
 local SAMUS_SPEED_Y = 0
+local OLD_SAMUS_SPEED_Y = 0
 local SCREEN_X = 0
 local SCREEN_Y = 0
 local SPARK_TIMER = 0
@@ -378,15 +375,13 @@ local function read_old_memory()
     OLD_GAME_STATE = mainmemory.read_u8(0x0998)
     OLD_SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
     OLD_SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
+    OLD_SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
 end
 
 local function read_new_memory()
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
-    GAME_STATE = mainmemory.read_u8(0x0998)
-    SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
-    SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
-
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
+    GAME_STATE = mainmemory.read_u8(0x0998)
     IFRAMES = mainmemory.read_u16_le(0x18A8)
     INPUT = mainmemory.read_u16_le(0x008B)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
@@ -400,8 +395,10 @@ local function read_new_memory()
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
     SAMUS_RADIUS_X = mainmemory.read_u8(0x0AFE)
     SAMUS_RADIUS_Y = mainmemory.read_u8(0x0B00)
-    SAMUS_SPEED_X = (mainmemory.read_s8(0x0B42) * 0x10000) + mainmemory.read_u16_le(0x0B44)
-    SAMUS_SPEED_Y = (mainmemory.read_s8(0x0B2E) * 0x10000) + mainmemory.read_u16_le(0x0B2C)
+    SAMUS_SPEED_X = (mainmemory.read_s16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
+    SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
+    SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
+    SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
     SCREEN_X = mainmemory.read_u16_le(0x0911)
     SCREEN_Y = mainmemory.read_u16_le(0x0915)
     SPEED_LEVEL = mainmemory.read_u8(0x0B3F)
@@ -462,22 +459,7 @@ local function samus_displacement()
     return samus_dx, samus_dy
 end
 
-local function draw_samus_hitbox(samus_dx)
-    local expected_dx = SAMUS_SPEED_X + SAMUS_DASH
-
-    local fg_color
-    if samus_dx > expected_dx then
-        fg_color = 0xFF00FF00
-    elseif samus_dx == expected_dx then
-        fg_color = 0xFF80FFFF
-    elseif 4 * samus_dx > 3 * expected_dx then
-        fg_color = 0xFFFF8000
-    elseif 4 * samus_dx > 2 * expected_dx then
-        fg_color = 0xFFFF0000
-    else
-        fg_color = 0xFF800000
-    end
-
+local function draw_samus_hitbox(samus_dx, samus_dy)
     -- hitbox around samus
     local x = (SAMUS_X >> 16) - SCREEN_X
     local y = (SAMUS_Y >> 16) - SCREEN_Y
@@ -485,8 +467,24 @@ local function draw_samus_hitbox(samus_dx)
     local y1 = y - SAMUS_RADIUS_Y
     local x2 = x + SAMUS_RADIUS_X
     local y2 = y + SAMUS_RADIUS_Y
-    local bg_color = 0x350000FF
-    gui.drawBox(x1, y1, x2, y2, fg_color, bg_color)
+    gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
+
+    -- speed expectation
+    local textpos = client.transformPoint(x1, y1)
+    local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *0x0B4A
+    local dx_ratio = samus_dx / expected_dx * 100
+    if dx_ratio == dx_ratio then
+        -- dx_ratio is not NaN
+        local expected_dx_msg = string.format("dx:%3.0f%%", samus_dx / expected_dx * 100)
+        gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg)
+    end
+    local expected_dy = OLD_SAMUS_SPEED_Y -- TODO this only works for positive values
+    local dy_ratio = samus_dy / expected_dy * 100
+    if dy_ratio == dy_ratio then
+        -- dy_ratio is not NaN
+        local expected_dy_msg = string.format("dy:%3.0f%%", samus_dy / expected_dy * 100)
+        gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
+    end
 
     -- walljump lines
     local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x81)
@@ -557,9 +555,7 @@ local function draw_enemy_projectile_hitboxes()
             local y1 = ENEMY_PROJECTILE_YS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
             local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
             local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
-
             gui.drawBox(x1, y1, x2, y2, 0xFFFF8000, 0x35FF8000)
-            -- TODO show projectile damage?
         end
     end
 end
@@ -821,7 +817,7 @@ while true do
 
     if gameplay() then
         local samus_dx, samus_dy = samus_displacement()
-        draw_samus_hitbox(samus_dx)
+        draw_samus_hitbox(samus_dx, samus_dy)
         draw_projectile_hitboxes()
         draw_powerbomb_hitbox()
         draw_enemy_hitboxes()
