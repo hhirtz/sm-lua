@@ -797,9 +797,14 @@ local function draw_hud(samus_dx, samus_dy)
 end
 
 event.onframestart(read_old_memory)
+event.onexit(function()
+    gui.clearGraphics()
+    gui.cleartext()
+end)
 while true do
     emu.frameadvance()
     gui.clearGraphics()
+    gui.cleartext()
     read_new_memory()
 
     do
