@@ -23,6 +23,7 @@ local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
 local POSE_NAMES = {
     -- ref: https://patrickjohnston.org/ASM/Lists/Super%20Metroid/Pose%20definitions.asm
     -- cat Pose\ definitions.asm | grep " ; " | sed 's/.* ; /[0x/' | sed 's/: /] = "/' | sed 's/.$/",/' | sort | grep -v '"Unused",' | sed 's/ \+- \+/, /g'
+    -- TODO this is a hash table because we use this notation, make it an array?
     [0x00] = "Facing forward, power suit",
     [0x01] = "Facing right, normal",
     [0x02] = "Facing left, normal",
@@ -619,6 +620,7 @@ local function draw_door_lag()
     else
         lag_msg = string.format("Door lag >%2d", sum)
     end
+    -- TODO use table.concat
     local sep = " ("
     if _dlag_elevator ~= 0 then
         lag_msg = lag_msg .. sep .. string.format("elevator =%2d", _dlag_elevator)
