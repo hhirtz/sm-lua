@@ -1,0 +1,241 @@
+-- bizhawk <-> lsnes compat layer
+bit.band = function(a, b)
+    return a & b
+end
+bit.bxor = function(a, b)
+    return a ~ b
+end
+bit.lshift = function(x, nplaces, nbits)
+    return (x << nplaces) & ((1 << nbits) - 1)
+end
+bit.lrshift = function(x, nplaces, nbits)
+    return (x >> nplaces) & ((1 << nbits) - 1)
+end
+memory.readword = function(domain, address)
+    if domain == 'BUS' then
+        domain = 'System Bus'
+    end
+    return memory.read_u16_le(address, domain)
+end
+
+-- sniq's code
+
+function GrappleCalc()
+
+	local gPointer = memory.readword('WRAM', 0x0D32)
+	local gSpeed = memory.readword('WRAM', 0x0D26)
+	local gEndAngle = memory.readword('WRAM', 0x0CFA)
+	local gVar = 0
+	local mult = 0
+	local multTwo = 0
+	local varThree = 0
+	local multThree = 0
+	local multFour = 0
+	local varFour = 0
+	local xVar = 0
+	local xVarTwo = 0
+
+	if (gPointer == 0xC79D)	--swinging
+	then
+		if (gSpeed < 0x8000) --if grapple speed is positive
+		then
+			gSpeed = bit.lshift(gSpeed, 1, 16)	--y index	$05EB
+			gEndAngle = bit.lshift(bit.band(XBA(gEndAngle), 0x00FF), 1, 16)
+			gVar = memory.readword('BUS', 0xA0B443 + gEndAngle)
+			if (gVar < 0x8000)	--positive
+			then
+				----------------calculate y swing-------------------------
+				mult = gVar * bit.band(gSpeed, 0x00FF)	--$05F1
+				multTwo = bit.band(XBA(gVar), 0x00FF) * gSpeed
+				varThree = bit.band(XBA(mult), 0x00FF) + multTwo	--$05F2
+				multThree = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)	--$4216
+				varThree = varThree + multThree
+				multFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF)
+				varFour = bit.band(XBA(varThree), 0x00FF) + multFour	--$05F3
+				mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+				gui.text(250, 150, string.format("v: %d.%d", varFour, mult), 0xFFFFFFFF)	--print y speed
+
+				----------------calculate x swing-------------------------
+				xVar = bit.band(XBA(bit.lrshift(gSpeed, 1, 16)), 0x00FF)	--$12
+				xVar = bit.lshift(xVar, 1, 16) + xVar	--$12
+				xVar = 0x40 - xVar	--$12
+				xVarTwo = memory.readword('BUS', 0xA0B443 + bit.lshift(bit.band(bit.band(XBA(memory.readword('WRAM', 0x0CFA)), 0x00FF) - xVar, 0x00FF), 1, 16))
+
+				if (xVarTwo < 0x8000)	--if positive
+				then
+					gVar = xVarTwo	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format("<: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				else	--negative
+					gVar = bit.bxor(xVarTwo, 0xFFFF) + 1	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format("<: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				end
+			else	--negative
+				----------------calculate y swing-------------------------
+				gVar = bit.bxor(gVar, 0xFFFF) + 1	--phy	$05E9
+				mult = gVar * bit.band(gSpeed, 0x00FF)	--$05F1
+				multTwo = bit.band(XBA(gVar), 0x00FF) * gSpeed
+				varThree = bit.band(XBA(mult), 0x00FF) + multTwo	--$05F2
+				multThree = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)	--$4216
+				varThree = varThree + multThree
+				multFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF)
+				varFour = bit.band(XBA(varThree), 0x00FF) + multFour	--$05F3
+				mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+				gui.text(250, 150, string.format("^: %d.%d", varFour, mult), 0xFFFFFFFF)	--print y speed
+
+				----------------calculate x swing-------------------------
+				xVar = bit.band(XBA(bit.lrshift(gSpeed, 1, 16)), 0x00FF)	--$12
+				xVar = bit.lshift(xVar, 1, 16) + xVar	--$12
+				xVar = 0x40 - xVar	--$12
+				xVarTwo = memory.readword('BUS', 0xA0B443 + bit.lshift(bit.band(bit.band(XBA(memory.readword('WRAM', 0x0CFA)), 0x00FF) - xVar, 0x00FF), 1, 16))
+
+
+				if (xVarTwo < 0x8000)	--if positive
+				then
+					gVar = xVarTwo	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format("<: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				else	--negative
+					gVar = bit.bxor(xVarTwo, 0xFFFF) + 1	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format("<: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				end
+			end
+		else --if grapple speed is negative
+			gSpeed = bit.lshift(bit.bxor(gSpeed, 0xFFFF) + 1, 1, 16)	--y index	$05EB
+			gEndAngle = bit.lshift(bit.band(XBA(gEndAngle), 0x00FF), 1, 16)
+			gVar = memory.readword('BUS', 0xA0B443 + gEndAngle)
+
+			if (gVar > 0x8000)	--negative
+			then
+				----------------calculate y swing-------------------------
+				gVar = bit.bxor(gVar, 0xFFFF) + 1	--phy	$05E9
+				mult = gVar * bit.band(gSpeed, 0x00FF)	--$05F1
+				multTwo = bit.band(XBA(gVar), 0x00FF) * gSpeed
+				varThree = bit.band(XBA(mult), 0x00FF) + multTwo	--$05F2
+				multThree = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)	--$4216
+				varThree = varThree + multThree
+				multFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF)
+				varFour = bit.band(XBA(varThree), 0x00FF) + multFour	--$05F3
+				mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+				gui.text(250, 150, string.format("v: %d.%d", varFour, mult), 0xFFFFFFFF)	--print y speed
+
+				----------------calculate x swing-------------------------
+				xVar = bit.band(XBA(bit.lrshift(gSpeed, 1, 16)), 0x00FF)	--$12
+				xVar = bit.lshift(xVar, 1, 16) + xVar	--$12
+				xVar = 0x40 - xVar	--$12
+				xVarTwo = memory.readword('BUS', 0xA0B443 + bit.lshift(bit.band(bit.band(XBA(memory.readword('WRAM', 0x0CFA)), 0x00FF) - xVar, 0x00FF), 1, 16))
+
+
+				if (xVarTwo < 0x8000)	--if positive
+				then
+					gVar = xVarTwo	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format(">: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				else	--negative
+					gVar = bit.bxor(xVarTwo, 0xFFFF) + 1	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format(">: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				end
+			else	--positive
+				----------------calculate y swing-------------------------
+				mult = gVar * bit.band(gSpeed, 0x00FF)	--$05F1
+				multTwo = bit.band(XBA(gVar), 0x00FF) * gSpeed
+				varThree = bit.band(XBA(mult), 0x00FF) + multTwo	--$05F2
+				multThree = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)	--$4216
+				varThree = varThree + multThree
+				multFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF)
+				varFour = bit.band(XBA(varThree), 0x00FF) + multFour	--$05F3
+				mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+				gui.text(250, 150, string.format("^: %d.%d", varFour, mult), 0xFFFFFFFF)	--print y-speed
+
+				----------------calculate x swing-------------------------
+				xVar = bit.band(XBA(bit.lrshift(gSpeed, 1, 16)), 0x00FF)	--$12
+				xVar = bit.lshift(xVar, 1, 16) + xVar	--$12
+				xVar = 0x40 - xVar	--$12
+				xVarTwo = memory.readword('BUS', 0xA0B443 + bit.lshift(bit.band(bit.band(XBA(memory.readword('WRAM', 0x0CFA)), 0x00FF) - xVar, 0x00FF), 1, 16))
+
+
+				if (xVarTwo < 0x8000)	--if positive
+				then
+					gVar = xVarTwo	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format(">: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				else	--negative
+					gVar = bit.bxor(xVarTwo, 0xFFFF) + 1	--$05E9
+					mult = bit.band(gVar, 0x00FF) * bit.band(gSpeed, 0x00FF)	--$05F1
+					multTwo = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar,0x00FF)
+					multThree = bit.band(XBA(mult), 0x00FF) + multTwo
+					multFour = bit.band(XBA(gSpeed), 0x00FF) * bit.band(gVar, 0x00FF)
+					varThree = bit.band(XBA(mult), 0x00FF) + multFour--$05F2
+					varFour = bit.band(XBA(gVar), 0x00FF) * bit.band(XBA(gSpeed), 0x00FF) + bit.band(XBA(varThree), 0x00FF)	--$05F3
+					mult = bit.band(XBA(mult), 0x00FF) + bit.band(XBA(varThree), 0xFF00)	--$05F1
+					gui.text(250, 170, string.format(">: %d.%d", varFour, mult), 0xFFFFFFFF)	--print x-speed
+				end
+			end
+		end
+	end
+end
+
+function XBA(twobyte)
+
+	local lowXBA = bit.lshift(bit.band(twobyte, 0x00FF), 8, 16)
+	local highXBA = bit.lrshift(bit.band(twobyte, 0xFF00), 8, 16)
+	return lowXBA + highXBA
+
+end
+
+function on_paint()
+
+GrappleCalc()
+end
+
+
+--require('bk2_compat').mainloop()
+while true do
+    GrappleCalc()
+    emu.frameadvance()
+end

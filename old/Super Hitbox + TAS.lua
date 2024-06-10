@@ -18,6 +18,8 @@ local logFlag                   = 0
 local xAdjust                   = 0
 local yAdjust                   = 0
 local doorList                  = {}
+local cameraX                   = 0
+local cameraY                   = 0
 
 local previousSamusXPosition    = 0
 local previousSamusYPosition    = 0
@@ -46,9 +48,9 @@ local colour_specialBlock       = 0x0000FF | colour_opacity
 local colour_doorcap            = 0xFF8000 | colour_opacity
 local colour_errorBlock         = 0x8000FF | colour_opacity
 
-local colour_scroll_red         = 0xFF0000 | colour_opacity
-local colour_scroll_blue        = 0x0000FF | colour_opacity
-local colour_scroll_green       = 0x00FF00 | colour_opacity
+--local colour_scroll_red         = 0xFF0000 | colour_opacity
+--local colour_scroll_blue        = 0x0000FF | colour_opacity
+--local colour_scroll_green       = 0x00FF00 | colour_opacity
 
 local colour_enemy              = 0xFFFFFF | colour_opacity
 local colour_spriteObject       = 0xFF8000 | colour_opacity
@@ -675,22 +677,26 @@ local doors = {
     [0xABE5] = true,
 }
 
+---@alias outlineFn fun(blockX: integer, blockY: integer, blockIndex: integer, stackLimit: integer)
 
 -- Draw standard block outline
+---@param colour luacolor
+---@return outlineFn
 local function standardOutline(colour)
-    return function(blockX, blockY, blockIndex, stackLimit)
+    return function(blockX, blockY, _, _)
         gui.drawRectangle(blockX, blockY, 15, 15, colour)
     end
 end
 
 -- Block drawing functions
+---@type table<integer, outlineFn>
 local outline = {}
 outline = {
     -- Air
-    [0x00] = function(blockX, blockY, blockIndex, stackLimit) end,
+    [0x00] = function(_, _, _, _) end,
 
     -- Slope
-    [0x01] = function(blockX, blockY, blockIndex, stackLimit)
+    [0x01] = function(blockX, blockY, blockIndex, _)
         local bts = sm.getBts(blockIndex)
         local i_slope = (bts & 0x1F)
         local flip_x = (bts & 0x40) ~= 0
@@ -858,57 +864,7 @@ local function isValidLevelData()
         or gameState == 0xB and doorTransitionFunction ~= 0xE36E
 end
 
-local function handleDebugControls()
-    local input = sm.getInput()
-    local changedInput = sm.getChangedInput()
-
-    if (input & sm.button_select) == 0 then
-        return
-    end
-
-    -- Show the clipdata and BTS of every block on screen
-    debugFlag = (debugFlag ~ (changedInput & sm.button_A))
-
-    -- Show the list of (possibly OoB) door block BTS that exist
-    doorListFlag = debugFlag
-
-    -- Lock camera to Samus' position
-    followSamusFlag = (followSamusFlag ~ (changedInput & sm.button_B))
-
-    -- Initialise door list
-    for i = 0, 0x7F do
-        doorList[i] = 0
-    end
-
-    if (input & sm.button_A) ~= 0 then
-        -- These move the Samus around
-        samusXPosition = (samusXPosition + (changedInput & sm.button_right) & 0xFFFF)
-        samusXPosition = (samusXPosition - ((changedInput & sm.button_left) >> 1) & 0xFFFF)
-        samusYPosition = (samusYPosition + ((changedInput & sm.button_down) >> 2) & 0xFFFF)
-        samusYPosition = (samusYPosition - ((changedInput & sm.button_up) >> 3) & 0xFFFF)
-        sm.setSamusXPosition(samusXPosition)
-        sm.setSamusYPosition(samusYPosition)
-    else
-        -- These move the camera around
-        xAdjust = xAdjust + ((changedInput & sm.button_right) >> 8) * 256
-        xAdjust = xAdjust - ((changedInput & sm.button_left) >> 9) * 256
-        yAdjust = yAdjust + ((changedInput & sm.button_down) >> 10) * 224
-        yAdjust = yAdjust - ((changedInput & sm.button_up) >> 11) * 224
-    end
-end
-
-local function displayCameraMargin()
-    local cameraDistanceIndex = sm.getCameraDistanceIndex()
-
-    local top = sm.getUpScroller()
-    local bottom = sm.getDownScroller()
-    local left = xemu.read_u16_le(0x90963F + cameraDistanceIndex)
-    local right = xemu.read_u16_le(0x909647 + cameraDistanceIndex)
-
-    gui.drawBox(left, top, right, bottom, colour_camera)
-end
-
-local function displayBlocks(cameraX, cameraY, roomWidth)
+local function displayBlocks(roomWidth)
     for y = 0, 14 do
         for x = 0, 16 do
             -- Impose a limit on the number of block extensions allowed, otherwise infinite loops can occur
@@ -938,119 +894,13 @@ local function displayBlocks(cameraX, cameraY, roomWidth)
     end
 end
 
-local function displayDebugInfo(cameraX, cameraY, roomWidth)
-    if debugInfoFlag == 0 then
-        return
-    end
-
-    local cameraXBlock = (cameraX >> 4)
-    local cameraYBlock = ((cameraY & 0xFFF) >> 4)
-    local clip = 0x7F0000 + ((2 + (cameraXBlock + cameraYBlock * roomWidth) * 2) & 0xFFFF)
-    local clip_end = 0x7F0002 + 0x1FE * roomWidth + 0x1FFE
-    local bts_end = 0x7F6402 + roomWidth * sm.getRoomHeight()
-    gui.text(0, 0,
-        string.format("cameraX: %03X\ncameraY: %03X\nClip: %X\nClip end: %X\nBTS end: %X", cameraXBlock, cameraYBlock,
-            clip, clip_end, bts_end), "cyan")
-
-    if debugFlag == 0 then
-        return
-    end
-
-    if doorListFlag ~= 0 then
-        p_doorList = sm.getDoorListPointer()
-        for i = 0, ((clip_end - 0x7F0002) << 1) do
-            if (sm.getLevelDatum(i) & 0xF000) == 0x9000 then
-                bts = (sm.getBts(i) & 0x7F)
-                if doors[xemu.read_u16_le(0x8F0000 + p_doorList + bts * 2)] then
-                    doorList[bts] = doorList[bts] + 1
-                end
-            end
-        end
-        doorListFlag = 0
-    end
-
-    y = 216
-    for j = 0, 0x7F do
-        i = 0x7F - j
-        if doorList[i] ~= 0 then
-            --gui.text(0, y, string.format("%02X x %i", i, doorList[i]), "cyan")
-            print("door:", i, doorList[i])
-            y = y - 8
-        end
-    end
-end
-
-local function displayFx(cameraX, cameraY)
+local function displayFx()
     local fxY = sm.getFxYPosition() - cameraY
     local lavaAcidY = sm.getLavaAcidYPosition() - cameraY
     local fxTargetY = sm.getFxTargetYPosition() - cameraY
     gui.drawLine(0, fxY, 255, fxY, 0xFF004080)
     gui.drawLine(0, lavaAcidY, 255, lavaAcidY, 0xFFFFC080)
     gui.drawLine(0, fxTargetY, 255, fxTargetY, 0xFFFFFFFF)
-end
-
-local function displayKraidHitbox(cameraX, cameraY)
-    if sm.getEnemyId(0) ~= 0xE2BF then
-        return
-    end
-
-    local kraidXPosition = sm.getEnemyXPosition(0)
-    local kraidYPosition = sm.getEnemyYPosition(0)
-    local p_kraidInstructionList = 0xA70000 + xemu.read_u16_le(0x7E0FAA)
-
-    -- Vulnerable hitbox for Kraid's mouth
-    local p_projectileHitbox = xemu.read_u16_le(p_kraidInstructionList - 2)
-    if p_projectileHitbox ~= 0xFFFF then
-        local kraidLeftOffset   = xemu.read_s16_le(0xA70000 + p_projectileHitbox)
-        local kraidTopOffset    = xemu.read_s16_le(0xA70000 + p_projectileHitbox + 2)
-        local kraidBottomOffset = xemu.read_s16_le(0xA70000 + p_projectileHitbox + 6)
-        local left              = kraidXPosition + kraidLeftOffset - cameraX
-        local top               = kraidYPosition + kraidTopOffset - cameraY
-        local bottom            = kraidYPosition + kraidBottomOffset - cameraY
-        gui.drawBox(left, top, 256, bottom, 0xFFFFFFFF)
-    end
-
-    -- Invulnerable hitbox for Kraid's mouth
-    p_projectileHitbox      = xemu.read_u16_le(p_kraidInstructionList - 4)
-    local kraidLeftOffset   = xemu.read_s16_le(0xA70000 + p_projectileHitbox)
-    local kraidTopOffset    = xemu.read_s16_le(0xA70000 + p_projectileHitbox + 2)
-    local kraidBottomOffset = xemu.read_s16_le(0xA70000 + p_projectileHitbox + 6)
-    local left              = kraidXPosition + kraidLeftOffset - cameraX
-    local top               = kraidYPosition + kraidTopOffset - cameraY
-    local bottom            = kraidYPosition + kraidBottomOffset - cameraY
-    gui.drawLine(left, top, 256, top, 0xFFFFFF80)
-    gui.drawLine(left, top, left, bottom, 0xFFFFFF80)
-
-    -- Kraid's body
-    local kraidSectionTopOffset = -0x8000
-    local kraidSectionRightOffset = kraidLeftOffset
-    for j = 1, 8 do
-        local i                        = 8 - j
-        local kraidSectionBottomOffset = xemu.read_s16_le(0xA7B161 + i * 4)
-        local kraidSectionLeftOffset   = xemu.read_s16_le(0xA7B161 + i * 4 + 2)
-        local left                     = kraidXPosition + kraidSectionLeftOffset - cameraX
-        local right                    = kraidXPosition + kraidSectionRightOffset - cameraX
-        local top                      = kraidYPosition + kraidSectionTopOffset - cameraY
-        local bottom                   = kraidYPosition + kraidSectionBottomOffset - cameraY
-
-        -- Projectile hitbox is only defined up to Kraid's head, Samus hitbox uses whole table
-        if kraidSectionTopOffset <= kraidBottomOffset then
-            gui.drawLine(left, top, right, top, 0xFFFF8080)
-            gui.drawLine(left, top, left, bottom, 0xFFFF8080)
-            local kraidSectionTopOffset    = math.max(kraidSectionTopOffset, kraidBottomOffset)
-            local kraidSectionBottomOffset = math.max(kraidSectionBottomOffset, kraidBottomOffset)
-            local top                      = kraidYPosition + kraidSectionTopOffset - cameraY
-            local bottom                   = kraidYPosition + kraidSectionBottomOffset - cameraY
-            gui.drawLine(left, top, right, top, 0xFFFFFF80)
-            gui.drawLine(left, top, left, bottom, 0xC0FFFFC0)
-        else
-            gui.drawLine(left, top, right, top, 0xC0FFFFC0)
-            gui.drawLine(left, top, left, bottom, 0xC0FFFFC0)
-        end
-
-        kraidSectionTopOffset   = kraidSectionBottomOffset
-        kraidSectionRightOffset = kraidSectionLeftOffset
-    end
 end
 
 local function displayMotherBrainHitbox(cameraX, cameraY)
@@ -1129,8 +979,7 @@ local function displayMotherBrainHitbox(cameraX, cameraY)
     --drawRightTriangle(xPositionBody, yPositionBody, x, y, "yellow")
 end
 
-local function displayEnemyHitboxes(cameraX, cameraY)
-    local y = 0
+local function displayEnemyHitboxes()
     local n_enemies = sm.getNEnemies()
     --drawText(0, 0, string.format("n_enemies: %04X", n_enemies), 0xFF00FFFF)
     if n_enemies == 0 then
@@ -1191,17 +1040,6 @@ local function displayEnemyHitboxes(cameraX, cameraY)
                 end
             end
 
-            -- Show enemy index and ID
-            --drawText(left + 16, top, string.format("%u: %04X", i, enemyId), colour_enemy)
-
-            -- Log enemy index and ID to list in top-right
-            if logFlag ~= 0 then
-                gui.text(224, y, string.format("%u: %04X", i, enemyId), colour_enemy)
-                --drawText(192, y, string.format("%u: %04X", i, sm.getEnemyInstructionList(i)), colour_enemy, 0xFF)
-                --drawText(160, y, string.format("%u: %04X", i, sm.getEnemyAiVariable5(i)), colour_enemy, 0xFF)
-                y = y + 8
-            end
-
             -- Show enemy health
             local enemySpawnHealth = xemu.read_u16_le(0xA00004 + enemyId)
             if enemySpawnHealth ~= 0 then
@@ -1230,20 +1068,11 @@ local function displaySpriteObjects(cameraX, cameraY)
 
             -- Draw sprite object
             gui.drawBox(left, top, right, bottom, colour_spriteObject)
-
-            -- Show sprite object index and ID
-            --drawText(left, top, string.format("%u: %04X", i, spriteObjectId), colour_spriteObject, "black")
-
-            -- Log sprite object index and ID to list in top-left
-            if logFlag ~= 0 then
-                gui.text(0, y, string.format("%u: %04X", i, spriteObjectId), colour_spriteObject, 0xFF000000)
-                y = y + 8
-            end
         end
     end
 end
 
-local function displayEnemyProjectileHitboxes(cameraX, cameraY)
+local function displayEnemyProjectileHitboxes()
     for j = 1, 18 do
         -- Iterate backwards, I want earlier enemy projectiles drawn on top of later ones
         local i = 18 - j
@@ -1260,23 +1089,11 @@ local function displayEnemyProjectileHitboxes(cameraX, cameraY)
 
             -- Draw enemy projectile hitbox
             gui.drawBox(left, top, right, bottom, colour_enemyProjectile)
-
-            if enemyProjectileId == 0xDE88 then
-                -- Show enemy projectile index and ID
-                --drawText(left, top, string.format("%u: %04X", i, xemu.read_u16_le(0x7E1B23 + i * 2)), colour_enemyProjectile)
-
-                -- Log enemy projectile index and ID to list in top-right (after sprite objects)
-                if logFlag ~= 0 then
-                    gui.text(0, y, string.format("%u: %04X", i, xemu.read_u16_le(0x7E1B23 + i * 2)),
-                        colour_enemyProjectile)
-                    y = y + 8
-                end
-            end
         end
     end
 end
 
-local function displayPowerBombExplosionHitbox(cameraX, cameraY)
+local function displayPowerBombExplosionHitbox()
     if sm.getPowerBombFlag() == 0 then
         return
     end
@@ -1294,7 +1111,7 @@ local function displayPowerBombExplosionHitbox(cameraX, cameraY)
     gui.drawBox(left, top, right, bottom, colour_powerBomb)
 end
 
-local function displayProjectileHitboxes(cameraX, cameraY)
+local function displayProjectileHitboxes()
     for i = 0, 9 do
         local projectileXPosition = sm.getProjectileXPosition(i)
         local projectileYPosition = sm.getProjectileYPosition(i)
@@ -1327,7 +1144,7 @@ local function displayProjectileHitboxes(cameraX, cameraY)
     end
 end
 
-local function displaySamusHitbox(cameraX, cameraY, samusXPosition, samusYPosition)
+local function displaySamusHitbox(samusXPosition, samusYPosition)
     local samusXSubposition = sm.getSamusXSubposition()
     local samusYSubposition = sm.getSamusYSubposition()
     local samusXSpeed = sm.getSamusXSpeed()
@@ -1514,7 +1331,7 @@ local function displayItemPercentage()
 end
 
 local function displayActiveGlitches(samusXPosition, samusYPosition)
-    function slopeKiller()
+    local function slopeKiller()
         local movementType = sm.getSamusMovementType()
 
         local isRelevantMovementType = false
@@ -1530,7 +1347,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         isActive = isActive and (sm.getSamusYSpeed() ~= 0 or sm.getSamusYSubspeed() ~= 0)
         isActive = isActive and
             sm.getSamusPreviousMovementType() ~=
-            0xF                                  -- crouching/standing/morphing/unmorphing transition
+            0xF -- crouching/standing/morphing/unmorphing transition
 
         if isActive then
             return ' slopekiller'
@@ -1539,7 +1356,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function moonfall()
+    local function moonfall()
         local isActive = true
         isActive = isActive and sm.getSamusYDirection() == 0    -- none
         isActive = isActive and (sm.getSamusYSpeed() ~= 0 or sm.getSamusYSubspeed() ~= 0)
@@ -1552,7 +1369,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function flashSuit()
+    local function flashSuit()
         local shinesparkTimer = sm.getShinesparkTimer()
         local paletteType = sm.getSpecialSamusPaletteType()
 
@@ -1565,7 +1382,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function xMode()
+    local function xMode()
         local poseInputHandler = sm.getSamusPoseInputHandler()
 
         local isRelevantPoseInputHandler = false
@@ -1573,7 +1390,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         isRelevantPoseInputHandler = isRelevantPoseInputHandler or poseInputHandler == 0xE926 -- auto-jump hack
         isRelevantPoseInputHandler = isRelevantPoseInputHandler or
             poseInputHandler ==
-            0xE90E                                                                            -- rts (shinespark / crystal flash / bomb jump / yapping maw)
+            0xE90E -- rts (shinespark / crystal flash / bomb jump / yapping maw)
 
         local isActive = true
         isActive = isActive and isRelevantPoseInputHandler
@@ -1587,7 +1404,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function gMode()
+    local function gMode()
         local isActive = true
         isActive = isActive and sm.getPlmEnableFlag() == 0
         isActive = isActive and sm.getGameState() < 9
@@ -1600,7 +1417,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function blueSuit()
+    local function blueSuit()
         local pose = sm.getSamusPose()
 
         local isActive = true
@@ -1615,7 +1432,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
         return ''
     end
 
-    function oob()
+    local function oob()
         local gameState          = sm.getGameState()
         local elevatorDelayTimer = sm.getDownwardsElevatorDelayTimer()
         local samusXRadius       = sm.getSamusXRadius()
@@ -1661,7 +1478,7 @@ local function displayActiveGlitches(samusXPosition, samusYPosition)
 end
 
 local function displayActiveTricks(samusXPosition, samusYPosition)
-    function btSkip()
+    local function btSkip()
         local pose = sm.getSamusPose()
         local samusXSubmomentum = sm.getSamusXSubmomentum()
         local doorTimer = sm.getPlmInstructionTimer(0x27)
@@ -1710,11 +1527,6 @@ local function on_paint()
     local samusXPosition = sm.getSamusXPositionSigned()
     local samusYPosition = sm.getSamusYPositionSigned()
 
-    -- Debug controls
-    if debugControlsEnabled ~= 0 then
-        handleDebugControls()
-    end
-
     -- Co-ordinates of the top-left of the screen
     if followSamusFlag ~= 0 then
         cameraX = samusXPosition - 128 + xAdjust
@@ -1730,7 +1542,7 @@ local function on_paint()
     --displayCameraMargin()
     --displayDebugInfo(cameraX, cameraY, roomWidth)
     if client.ispaused() then
-        displayBlocks(cameraX, cameraY, roomWidth)
+        displayBlocks(roomWidth)
         displayFx(cameraX, cameraY)
     end
 

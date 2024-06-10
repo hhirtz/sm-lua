@@ -9,6 +9,7 @@ local _read_u8 = memory.read_u8
 local _read_s8 = memory.read_s8
 local _read_u16_le = memory.read_u16_le
 local _read_s16_le = memory.read_s16_le
+
 ---@type table<string, table<1|2, table<boolean, fun(address: integer): integer>>>
 local _readers = {
     WRAM = {
@@ -88,9 +89,11 @@ local function makeArrayReader(address, byte_size, is_signed, interval, domain)
     return function(i) return reader(address + i * interval) end
 end
 
+--[[
 local function makeAggregateReader(readers)
     return function(i) return readers[i + 1] end
 end
+-- ]]
 
 local function makeWriter(p, n, interval)
     -- p: Pointer to WRAM
@@ -929,7 +932,7 @@ sm.getAram_instrumentTable                         = makeAramReader(0x386D, 1, f
 sm.getAram_trackerData                             = makeAramReader(0x3957, 1, false, 1)
 sm.getAram_sampleTable                             = makeAramReader(0x4A00, 1, false, 1)
 sm.getAram_sampleData_echoBuffer                   = makeAramReader(0x4B00, 1, false, 1)
-]]
+-- ]]
 
 sm.poses = {
     [0x00] = 'Facing forward',
