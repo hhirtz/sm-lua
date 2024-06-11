@@ -493,6 +493,7 @@ local function draw_samus_hitbox()
     gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
     -- walljump lines
+    -- TODO some cases of walljump check are not shown
     local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x81)
     local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x82)
     local pressing_right = (INPUT & BUTTON_RIGHT) ~= 0
@@ -524,6 +525,7 @@ local function draw_speed_percent(samus_dx, samus_dy)
     local dy_ratio = samus_dy / expected_dy * 100
     if dy_ratio == dy_ratio then
         -- dy_ratio is not NaN
+        -- TODO show correct sign on moonfall
         local expected_dy_msg = string.format("dy:%3.0f%%", samus_dy / expected_dy * 100)
         gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
     end
