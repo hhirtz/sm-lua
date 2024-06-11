@@ -646,6 +646,74 @@ local function draw_enemy_projectile_hitboxes()
     end
 end
 
+local _SLOPES = {}
+local function build_slopes()
+    local slope_data = memory.read_bytes_as_array(0x948B2B, 0x20 << 4)
+
+    local ys = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    local function build_slope(slope_index, flip_x, flip_y)
+        for x = 0, 15 do
+            local i = x
+            if flip_x then
+                i = 15 - x
+            end
+            local y = slope_data[(slope_index << 4) + i + 1]
+            if flip_y and y < 16 then
+                y = 15 - y
+            end
+            ys[x + 1] = y
+        end
+
+        local x_min
+        for x = 1, 16 do
+            if ys[x] < 16 then
+                x_min = x - 1
+                break
+            end
+        end
+        if x_min == nil then
+            return {}
+        end
+
+        local x_max
+        for x = 16, 1, -1 do
+            if ys[x] < 16 then
+                x_max = x - 1
+                break
+            end
+        end
+
+        local y_base = 15
+        if flip_y then
+            y_base = 0
+        end
+
+        local points = {
+            { x_max, y_base },
+            { x_min, y_base },
+            { x_min, ys[x_min + 1] },
+        }
+
+        for x = x_min + 1, x_max do
+            if ys[x] < 0x10 and ys[x + 1] < 0x10 then
+                points[#points + 1] = { x, ys[x] }
+                if ys[x] ~= ys[x + 1] then
+                    points[#points + 1] = { x, ys[x + 1] }
+                end
+            end
+        end
+
+        return points
+    end
+
+    for i = 0, 0x1F do
+        _SLOPES[#_SLOPES + 1] = build_slope(i, false, false)
+        _SLOPES[#_SLOPES + 1] = build_slope(i, true, false)
+        _SLOPES[#_SLOPES + 1] = build_slope(i, false, true)
+        _SLOPES[#_SLOPES + 1] = build_slope(i, true, true)
+    end
+end
+
 local _SIMPLE_OUTLINES = {
     0x00000000,         -- 0x00: air
     false,
@@ -667,65 +735,10 @@ local _SIMPLE_OUTLINES = {
 local _COMPLEX_OUTLINES
 _COMPLEX_OUTLINES = {
     -- slope
-    -- TODO cache slope polygons
     [0x01] = function(index, _)
-        local block_bts = BLOCK_BTS[index]
-        local slope_index = block_bts & 0x1F
-        local flip_x = (block_bts & 0x40) ~= 0
-        local flip_y = (block_bts & 0x80) ~= 0
-
-        local ys = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-        for x = 0, 0x0F do
-            local i = x
-            if flip_x then
-                i = 0x0F - x
-            end
-            local y = SLOPE_DATA[(slope_index << 4) + i + 1]
-            if flip_y and y < 0x10 then
-                y = 0x0F - y
-            end
-            ys[x + 1] = y
-        end
-
-        local x_min
-        for x = 1, 0x10 do
-            if ys[x] < 0x10 then
-                x_min = x - 1
-                break
-            end
-        end
-        assert(x_min ~= nil)
-
-        local x_max
-        for x = 0x10, 1, -1 do
-            if ys[x] < 0x10 then
-                x_max = x - 1
-                break
-            end
-        end
-        assert(x_max ~= nil)
-
-        local y_base = 0x0F
-        if flip_y then
-            y_base = 0x00
-        end
-
-        local points = {
-            { x_max, y_base },
-            { x_min, y_base },
-            { x_min, ys[x_min + 1] },
-        }
-
-        for x = x_min + 1, x_max do
-            if ys[x] < 0x10 and ys[x + 1] < 0x10 then
-                points[#points + 1] = { x, ys[x] }
-                if ys[x] ~= ys[x + 1] then
-                    points[#points + 1] = { x, ys[x + 1] }
-                end
-            end
-        end
-
-        return { points = points, color = TILE_COLOR_SLOPE }
+        local bts = BLOCK_BTS[index]
+        local slope_index = ((bts & 0x1F) << 2) | ((bts & 0xC0) >> 6)
+        return _SLOPES[slope_index + 1]
     end,
 
     -- horizontal extension
@@ -733,12 +746,12 @@ _COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local block_bts = BLOCK_BTS[index]
-        if block_bts == 0 then
+        local bts = BLOCK_BTS[index]
+        if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = index + u8_to_s8(block_bts)
+        local extension_index = index + u8_to_s8(bts)
         local block_type = BLOCK_DATA[extension_index << 1] >> 4
         return _SIMPLE_OUTLINES[block_type + 1] or
             _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
@@ -746,8 +759,8 @@ _COMPLEX_OUTLINES = {
 
     -- shootable block
     [0x0C] = function(index, _)
-        local block_bts = BLOCK_BTS[index]
-        if 0x40 <= block_bts and block_bts <= 0x43 then
+        local bts = BLOCK_BTS[index]
+        if 0x40 <= bts and bts <= 0x43 then
             return TILE_COLOR_DOORCAP
         else
             return TILE_COLOR_SPECIAL
@@ -759,17 +772,18 @@ _COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local block_bts = BLOCK_BTS[index]
-        if block_bts == 0 then
+        local bts = BLOCK_BTS[index]
+        if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = index + u8_to_s8(block_bts) * ROOM_WIDTH
+        local extension_index = index + u8_to_s8(bts) * ROOM_WIDTH
         local block_type = BLOCK_DATA[extension_index << 1] >> 4
         return _SIMPLE_OUTLINES[block_type + 1] or
             _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
     end,
 }
+
 local _block_cache = {} -- TODO clear on ROM change
 local function draw_blocks()
     local valid_level_data =
@@ -787,7 +801,9 @@ local function draw_blocks()
         local statics = {}
         local dynamics = {}
 
-        SLOPE_DATA = memory.read_bytes_as_array(0x948B2B, 0x1F << 4)
+        if #_SLOPES == 0 then
+            build_slopes()
+        end
         BLOCK_DATA = memory.read_bytes_as_array(0x7F0002, (ROOM_WIDTH * ROOM_HEIGHT) << 1)
         BLOCK_BTS = memory.read_bytes_as_array(0x7F6402, ROOM_WIDTH * ROOM_HEIGHT)
         for y = 0, ROOM_HEIGHT - 1 do
@@ -822,7 +838,7 @@ local function draw_blocks()
                     drawRectangle(block_x, block_y, 15, 15, block)
                 end
             else --type(block) == "table"
-                drawPolygon(block.points, block_x, block_y, block.color)
+                drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
             end
         end
     end
