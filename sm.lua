@@ -303,10 +303,6 @@ local SEEKED = true
 -----------------------------
 -- actual code
 
-local function snes2pc(address)
-    return ((address >> 1) & 0x3F8000) | (address & 0x7FFF)
-end
-
 local function read_enemy_data(res)
     local MAX_ENEMIES = 32
     local bytes = mainmemory.read_bytes_as_array(0x0F78, 0x40 * MAX_ENEMIES)
@@ -322,7 +318,7 @@ local function read_enemy_data(res)
             radius_x = bytes[offset + 10]| (bytes[offset + 11] << 8),
             radius_y = bytes[offset + 12]| (bytes[offset + 13] << 8),
             health = bytes[offset + 20]| (bytes[offset + 21] << 8),
-            max_health = memory.read_u16_le(snes2pc(0xA00004 + id), "CARTROM"),
+            max_health = memory.read_u16_le(0xA00004 + id),
         }
     end
 end
