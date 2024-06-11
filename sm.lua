@@ -283,9 +283,7 @@ local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
-local ROOM_POINTER = 0
 local ROOM_WIDTH = 0
-local ROOM_HEIGHT = 0
 local SAMUS_X = 0
 local OLD_SAMUS_X = 0
 local SAMUS_Y = 0
@@ -317,12 +315,6 @@ local ENEMY_PROJECTILE_IDS = {}
 local ENEMY_PROJECTILE_XS = {}
 local ENEMY_PROJECTILE_YS = {}
 local ENEMY_PROJECTILE_RADIUSES = {}
-
--- These are only initialized when first entering a room,
--- to generate hitboxes for the tiles in the room
-local SLOPE_DATA = {}
-local BLOCK_DATA = {}
-local BLOCK_BTS = {}
 
 
 -----------------------------
@@ -429,9 +421,7 @@ local function read_new_memory()
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
     POWERBOMB_Y = mainmemory.read_u16_le(0x0CE4)
-    ROOM_POINTER = mainmemory.read_u16_le(0x079B)
     ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
-    ROOM_HEIGHT = mainmemory.read_u16_le(0x07A7)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0X0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0X0B36)
     SAMUS_DASH = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
@@ -732,34 +722,41 @@ local _SIMPLE_OUTLINES = {
     TILE_COLOR_SPECIAL, -- 0x0E: grapple block
     TILE_COLOR_SPECIAL, -- 0x0F: bombable block
 }
+local function get_bts(global_index, line_index, line_bts)
+    local res
+    if line_bts then
+        res = line_bts[line_index]
+    end
+    return res or memory.read_u8(0x7F6402 + global_index)
+end
 local _COMPLEX_OUTLINES
 _COMPLEX_OUTLINES = {
     -- slope
-    [0x01] = function(index, _)
-        local bts = BLOCK_BTS[index]
+    [0x01] = function(global_index, line_index, _, line_bts, _)
+        local bts = get_bts(global_index, line_index, line_bts)
         local slope_index = ((bts & 0x1F) << 2) | ((bts & 0xC0) >> 6)
         return _SLOPES[slope_index + 1]
     end,
 
     -- horizontal extension
-    [0x05] = function(index, stack_limit)
+    [0x05] = function(global_index, line_index, _, line_bts, stack_limit)
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = BLOCK_BTS[index]
+        local bts = get_bts(global_index, line_index, line_bts)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = index + u8_to_s8(bts)
-        local block_type = BLOCK_DATA[extension_index << 1] >> 4
+        local extension_index = global_index + u8_to_s8(bts)
+        local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return _SIMPLE_OUTLINES[block_type + 1] or
-            _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
+            _COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
     end,
 
     -- shootable block
-    [0x0C] = function(index, _)
-        local bts = BLOCK_BTS[index]
+    [0x0C] = function(global_index, line_index, _, line_bts, _)
+        local bts = get_bts(global_index, line_index, line_bts)
         if 0x40 <= bts and bts <= 0x43 then
             return TILE_COLOR_DOORCAP
         else
@@ -768,23 +765,22 @@ _COMPLEX_OUTLINES = {
     end,
 
     -- vertical extension
-    [0x0D] = function(index, stack_limit)
+    [0x0D] = function(global_index, line_index, _, line_bts, stack_limit)
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = BLOCK_BTS[index]
+        local bts = get_bts(global_index, line_index, line_bts)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = index + u8_to_s8(bts) * ROOM_WIDTH
-        local block_type = BLOCK_DATA[extension_index << 1] >> 4
+        local extension_index = global_index + u8_to_s8(bts) * ROOM_WIDTH
+        local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return _SIMPLE_OUTLINES[block_type + 1] or
-            _COMPLEX_OUTLINES[block_type](extension_index, stack_limit - 1)
+            _COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
     end,
 }
 
-local _block_cache = {} -- TODO clear on ROM change
 local function draw_blocks()
     local valid_level_data =
         (0x08 <= GAME_STATE and GAME_STATE < 0x0B) or
@@ -796,48 +792,33 @@ local function draw_blocks()
         return
     end
 
-    local blocks = _block_cache[ROOM_POINTER]
-    if not blocks then
-        local statics = {}
-        local dynamics = {}
-
-        if #_SLOPES == 0 then
-            build_slopes()
-        end
-        BLOCK_DATA = memory.read_bytes_as_array(0x7F0002, (ROOM_WIDTH * ROOM_HEIGHT) << 1)
-        BLOCK_BTS = memory.read_bytes_as_array(0x7F6402, ROOM_WIDTH * ROOM_HEIGHT)
-        for y = 0, ROOM_HEIGHT - 1 do
-            for x = 0, ROOM_WIDTH - 1 do
-                local block_index = y * ROOM_WIDTH + x + 1
-                local block_type = BLOCK_DATA[block_index << 1] >> 4
-                local outline = _SIMPLE_OUTLINES[block_type + 1] or
-                    _COMPLEX_OUTLINES[block_type](block_index, 224)
-                statics[block_index] = outline
-            end
-        end
-
-        blocks = { statics = statics, dynamics = dynamics }
-        _block_cache[ROOM_POINTER] = blocks
+    if #_SLOPES == 0 then
+        build_slopes()
     end
 
-    local statics = blocks.statics          -- \
     local drawRectangle = gui.drawRectangle -- use locals instead of hash accesses
     local drawPolygon = gui.drawPolygon     -- /
     local screen_x_offset = SCREEN_X & 0x0F
     local screen_y_offset = SCREEN_Y & 0x0F
     for y = 0, 14 do
         local block_y = (y << 4) - screen_y_offset
-        local index_offset = ((SCREEN_Y + (y << 4)) >> 4) * ROOM_WIDTH + (SCREEN_X >> 4) + 1
+        local index_offset = ((SCREEN_Y + (y << 4)) >> 4) * ROOM_WIDTH + (SCREEN_X >> 4)
+        local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), 34)
+        local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, 17)
         for x = 0, 16 do
             local block_x = (x << 4) - screen_x_offset
-            local block = statics[index_offset + x]
-            if block == nil then
-                -- out of bounds & out of "parallel worlds" => draw nothing
-            elseif type(block) == "number" then
+            local line_index = x + 1
+            if line_index > #line_bts then
+                break
+            end
+            local block_type = line_data[line_index << 1] >> 4
+            local block = _SIMPLE_OUTLINES[block_type + 1] or
+                _COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
+            if type(block) == "number" then
                 if block ~= 0 then
                     drawRectangle(block_x, block_y, 15, 15, block)
                 end
-            else --type(block) == "table"
+            else -- type(block) == "table"
                 drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
             end
         end
