@@ -284,10 +284,6 @@ local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
 local ROOM_WIDTH = 0
-local SAMUS_X = 0
-local OLD_SAMUS_X = 0
-local SAMUS_Y = 0
-local OLD_SAMUS_Y = 0
 local SAMUS_DASH = 0
 local SAMUS_DIRECTION_X = 0
 local SAMUS_DIRECTION_Y = 0
@@ -297,6 +293,11 @@ local SAMUS_RADIUS_Y = 0
 local SAMUS_SPEED_X = 0
 local SAMUS_SPEED_Y = 0
 local OLD_SAMUS_SPEED_Y = 0
+local SAMUS_X = 0
+local OLD_SAMUS_X = 0
+local SAMUS_Y = 0
+local OLD_SAMUS_Y = 0
+local SAMUS_Y_ACCEL_AIR = 0
 local SCREEN_X = 0
 local SCREEN_Y = 0
 local SPARK_TIMER = 0
@@ -373,8 +374,8 @@ local function read_new_memory()
     POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
     POWERBOMB_Y = mainmemory.read_u16_le(0x0CE4)
     ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
-    SAMUS_DIRECTION_X = mainmemory.read_u8(0X0A1E)
-    SAMUS_DIRECTION_Y = mainmemory.read_u8(0X0B36)
+    SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
+    SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
     SAMUS_DASH = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
     SAMUS_RADIUS_X = mainmemory.read_u8(0x0AFE)
@@ -511,51 +512,38 @@ local function draw_grapple_throw_speed()
         return
     end
 
-    local function u16_mult(a, y)
-        -- ref: https://patrickjohnston.org/bank/80#f82D6
-        local a_lo = a & 0xFF
-        local a_hi = a >> 8
-        local y_lo = y & 0xFF
-        local y_hi = y >> 8
-
-        -- a*y == a_lo*y_lo + (a_hi*y_lo + a_lo*y_hi)<<8 + (a_hi*y_hi)<<16
-        -- however, the carry from (a_hi*y_lo + a_lo*y_hi) is not propagated to
-        -- the result, thus the "& 0xffff"
-
-        return (a_lo * y_lo) +
-            (((a_hi * y_lo + a_lo * y_hi) & 0xFFFF) << 8) +
-            ((a_hi * y_hi) << 16)
+    local function u16_mul(a, y)
+        -- ref: 80:82D6
+        local a_lo = a & 0x00FF
+        local a_hi = a & 0xFF00
+        local y_lo = y & 0x00FF
+        local y_hi = y & 0xFF00
+        return ((a_lo * y_lo + a_hi * y_lo + a_lo * y_hi) & 0xFFFFFF) + a_hi * y_hi
     end
 
-    -- ref: https://patrickjohnston.org/bank/9B#fCA65
+    -- ref: 9B:CA65
 
     local rot_speed = math.abs(GRAPPLE_SPEED) << 1
 
-    -- TODO make this a table, maybe
-    local sin_end_angle = memory.read_s16_le(0xA0B443 + (GRAPPLE_ANGLE >> 7))
+    local sin_angle = memory.read_s16_le(0xA0B443 + ((GRAPPLE_ANGLE >> 8) << 1))
+    local speed_y = u16_mul(rot_speed, math.abs(sin_angle))
+    local going_up = (sin_angle >= 0) ~= (GRAPPLE_SPEED >= 0)
 
-    local going_up = (sin_end_angle >= 0) ~= (GRAPPLE_SPEED >= 0)
-    local speed_y = u16_mult(rot_speed, math.abs(sin_end_angle)) >> 16
+    local h12 = ((GRAPPLE_ANGLE >> 8) - 0x40 + 3 * (rot_speed >> 9)) & 0xFF
+    local sin_h12 = memory.read_s16_le(0xA0B443 + (h12 << 1))
+    local speed_x = u16_mul(rot_speed, math.abs(sin_h12))
+    local going_left = SAMUS_DIRECTION_X == 4
 
-    local x_angle = (GRAPPLE_ANGLE >> 7) - 0x40 + (rot_speed >> 9) * 3
-    local sin_x_angle = memory.read_s16_le(0xA0B443 + x_angle)
-    local speed_x = u16_mult(rot_speed, math.abs(sin_x_angle))
-
-    -- TODO show at the same place as dx/dy when sling
     local textpos = client.transformPoint(
         (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X,
         (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y)
 
-    local text_x = string.format(">%3d.%05d", speed_x >> 16, speed_x & 0xFFFF)
-    gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, text_x)
-
-    local text_y
-    if going_up then
-        text_y = string.format("^%3d.%05d", speed_y >> 16, speed_y & 0xFFFF)
-    else
-        text_y = string.format("v%3d.%05d", speed_y >> 16, speed_y & 0xFFFF)
-    end
-    gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, text_y)
+    local horiz_dir = (going_left and "<") or ">"
+    local vert_dir = (going_up and "^") or "v"
+    local text = string.format("%s%3d.%05d\n%s%3d.%05d",
+        horiz_dir, speed_x >> 16, speed_x & 0xFFFF,
+        vert_dir, speed_y >> 16, speed_y & 0xFFFF)
+    gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, text)
 end
 
 local function draw_enemy_hitboxes()
