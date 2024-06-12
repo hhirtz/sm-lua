@@ -362,7 +362,7 @@ local function Stats_get(stats)
 end
 
 local function Stats_print_rare(stats)
-    if FRAME_NO % 300 ~= 0 then
+    if stats.count % 300 ~= 0 then
         return
     end
     local v = Stats_get(stats)
