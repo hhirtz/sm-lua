@@ -128,7 +128,7 @@ function gui.drawRectangle(x, y, width, height, fg, bg, surfacename) end
 ---@param message string
 ---@param fg? luacolor  something by default
 ---@param anchor? "topleft" | "topright" | "bottomleft" | "bottomright"
-function gui.text(x, y, message, height, fg, anchor) end
+function gui.text(x, y, message, fg, anchor) end
 
 ---@class (exact) input
 input = {}
