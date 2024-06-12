@@ -197,6 +197,12 @@ function memory.read_u16_le(address, domain) end
 ---@param domain? string
 ---@return integer
 ---@nodiscard
+function memory.read_u32_le(address, domain) end
+
+---@param address integer
+---@param domain? string
+---@return integer
+---@nodiscard
 function memory.read_s16_le(address, domain) end
 
 ---@param address integer
