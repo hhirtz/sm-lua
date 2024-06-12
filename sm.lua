@@ -798,30 +798,26 @@ local function draw_blocks()
         build_slopes()
     end
 
-    local drawRectangle = gui.drawRectangle -- use locals instead of hash accesses
-    local drawPolygon = gui.drawPolygon     -- /
     local screen_x_offset = SCREEN_X & 0x0F
     local screen_y_offset = SCREEN_Y & 0x0F
+    local screen_offset = (SCREEN_Y >> 4) * ROOM_WIDTH + (SCREEN_X >> 4)
     for y = 0, 14 do
         local block_y = (y << 4) - screen_y_offset
-        local index_offset = ((SCREEN_Y + (y << 4)) >> 4) * ROOM_WIDTH + (SCREEN_X >> 4)
+        local index_offset = screen_offset + y * ROOM_WIDTH
         local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), 34)
         local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, 17)
         for x = 0, 16 do
             local block_x = (x << 4) - screen_x_offset
             local line_index = x + 1
-            if line_index > #line_bts then
-                break
-            end
             local block_type = line_data[line_index << 1] >> 4
             local block = _SIMPLE_OUTLINES[block_type + 1] or
                 _COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
             if type(block) == "number" then
                 if block ~= 0 then
-                    drawRectangle(block_x, block_y, 15, 15, block)
+                    gui.drawRectangle(block_x, block_y, 15, 15, block)
                 end
             else -- type(block) == "table"
-                drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
+                gui.drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
             end
         end
     end
