@@ -636,6 +636,8 @@ local function draw_enemy_projectile_hitboxes()
     end
 end
 
+-- Build and cache slope polygons
+-- polygon from slope S is stored at _SLOPES[4 * S + 2 * flip_y + flip_x + 1]
 local _SLOPES = {}
 local function build_slopes()
     local slope_data = memory.read_bytes_as_array(0x948B2B, 0x20 << 4)
