@@ -8,6 +8,7 @@
 --  - Grapple swing speed prediction
 --  - Door lag
 --  - mark door transitions as lag in tastudio
+--  - slopekiller prediction
 --
 -- How to use:
 --
@@ -280,6 +281,7 @@ local GRAPPLE_SPEED = 0
 local IFRAMES = 0
 local INPUT = 0
 local KNOCKBACK = 0
+local LIQUID_PHYSICS = 0
 local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
@@ -291,6 +293,7 @@ local SAMUS_DIRECTION_Y = 0
 local SAMUS_POSE = 0
 local SAMUS_RADIUS_X = 0
 local SAMUS_RADIUS_Y = 0
+local SAMUS_SPEED_CAP_Y = nil
 local SAMUS_SPEED_X = 0
 local SAMUS_SPEED_Y = 0
 local OLD_SAMUS_SPEED_Y = 0
@@ -298,7 +301,9 @@ local SAMUS_X = 0
 local OLD_SAMUS_X = 0
 local SAMUS_Y = 0
 local OLD_SAMUS_Y = 0
-local SAMUS_Y_ACCEL_AIR = 0
+local SAMUS_Y_ACCEL_AIR = nil
+local SAMUS_Y_ACCEL_LAVA = nil
+local SAMUS_Y_ACCEL_WATER = nil
 local SCREEN_X = 0
 local SCREEN_Y = 0
 local SPARK_TIMER = 0
@@ -371,6 +376,7 @@ local function read_new_memory()
     IFRAMES = mainmemory.read_u16_le(0x18A8)
     INPUT = mainmemory.read_u16_le(0x008B)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
+    LIQUID_PHYSICS = mainmemory.read_u16_le(0x0AD2)
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
@@ -382,10 +388,14 @@ local function read_new_memory()
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
     SAMUS_RADIUS_X = mainmemory.read_u8(0x0AFE)
     SAMUS_RADIUS_Y = mainmemory.read_u8(0x0B00)
+    SAMUS_SPEED_CAP_Y = SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
     SAMUS_SPEED_X = (mainmemory.read_s16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
     SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
     SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
     SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
+    SAMUS_Y_ACCEL_AIR = SAMUS_Y_ACCEL_AIR or (memory.read_u16_le(0x909EA7) << 16) | memory.read_u16_le(0x909EA1)
+    SAMUS_Y_ACCEL_LAVA = SAMUS_Y_ACCEL_LAVA or (memory.read_u16_le(0x909EAB) << 16) | memory.read_u16_le(0x909EA5)
+    SAMUS_Y_ACCEL_WATER = SAMUS_Y_ACCEL_WATER or (memory.read_u16_le(0x909EA9) << 16) | memory.read_u16_le(0x909EA3)
     SCREEN_X = mainmemory.read_u16_le(0x0911)
     SCREEN_Y = mainmemory.read_u16_le(0x0915)
     SPEED_LEVEL = mainmemory.read_u8(0x0B3F)
@@ -770,6 +780,50 @@ local function draw_blocks()
     end
 end
 
+local function draw_slopekiller_line()
+    if SAMUS_POSE ~= 0x31 and
+        SAMUS_POSE ~= 0x32 and
+        (SAMUS_POSE < 0x7D or 0x80 < SAMUS_POSE)
+    then
+        -- not morphed or on ground
+        return
+    end
+
+    -- TODO mixed air/water physics
+    -- TODO pixel offset from level data
+    -- TODO handle horizontal movement: 90:8EA9
+
+    -- Up press lag: samus falls at full speed for one frame
+    local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
+
+    local unmorph_length = 6
+    local accel_y = SAMUS_Y_ACCEL_AIR
+    if LIQUID_PHYSICS == 1 then
+        unmorph_length = 12
+        accel_y = SAMUS_Y_ACCEL_WATER
+    elseif LIQUID_PHYSICS == 2 then
+        unmorph_length = 12
+        accel_y = SAMUS_Y_ACCEL_LAVA
+    end
+    local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or SAMUS_SPEED_Y
+    while unmorph_length > 0 do
+        -- TODO 90:A16C  94:86FE
+        y = y + speed_y
+        if SAMUS_SPEED_Y >= 0 and speed_y >> 16 ~= SAMUS_SPEED_CAP_Y then
+            speed_y = speed_y + accel_y
+        end
+        unmorph_length = unmorph_length - 1
+    end
+    y = y + 0x100000 -- crouching pose radius (ref: 91:B629)
+
+    local y_hi = (y >> 16)
+
+    local y_line = y_hi - SCREEN_Y
+    gui.drawLine(0, y_line, 256, y_line, 0xFFFFFFFF)
+    local textpos = client.transformPoint(0, y_line - 1)
+    gui.text(0, textpos.y - GUI_FONT_SIZE, string.format("%d", y_hi))
+end
+
 local _dlag_seen_transition_start = false
 local _dlag_seen_transition_end = false
 local _dlag_elevator = 0
@@ -1040,6 +1094,7 @@ while true do
         local samus_dx, samus_dy = samus_displacement()
         draw_samus_hitbox()
         draw_speed_percent(samus_dx, samus_dy)
+        draw_slopekiller_line()
         draw_projectile_hitboxes()
         draw_powerbomb_hitbox()
         draw_grapple_throw_speed()
