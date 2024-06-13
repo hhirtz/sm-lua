@@ -347,6 +347,7 @@ local function read_enemy_data(res)
             radius_y = bytes[offset + 12]| (bytes[offset + 13] << 8),
             health = bytes[offset + 20]| (bytes[offset + 21] << 8),
             max_health = memory.read_u16_le(0xA00004 + id),
+            iframes = bytes[offset + 40]|(bytes[offset + 41] << 8),
         }
     end
 end
@@ -556,9 +557,15 @@ local function draw_enemy_hitboxes()
 
             -- TODO extended sprite map
             gui.drawBox(x1, y1, x2, y2, 0xFFFF0000, 0x35FF0000)
-            local textpos = client.transformPoint(x1, y1)
-            gui.text(textpos.x, textpos.y - GUI_FONT_SIZE,
-                string.format("hp: %d/%d", ENEMY_DATA[i].health, ENEMY_DATA[i].max_health))
+            local textpos = client.transformPoint(x1 + 1, y1 + 1)
+            local text
+            if ENEMY_DATA[i].iframes ~= 0 then
+                text = string.format("hp: %d/%d\ninv %d",
+                    ENEMY_DATA[i].health, ENEMY_DATA[i].max_health, ENEMY_DATA[i].iframes)
+            else
+                text = string.format("hp: %d/%d", ENEMY_DATA[i].health, ENEMY_DATA[i].max_health)
+            end
+            gui.text(textpos.x, textpos.y, text)
         end
     end
 end
