@@ -169,6 +169,16 @@ function mainmemory.read_u16_le(address) end
 ---@nodiscard
 function mainmemory.read_s16_le(address) end
 
+---@param address integer
+---@return integer
+---@nodiscard
+function mainmemory.read_u32_le(address) end
+
+---@param address integer
+---@return integer
+---@nodiscard
+function mainmemory.read_s32_le(address) end
+
 ---@class (exact) memory
 memory = {}
 
