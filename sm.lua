@@ -9,6 +9,7 @@
 --  - Door lag
 --  - mark door transitions as lag in tastudio
 --  - slopekiller prediction
+--  - jump speed prediction
 --
 -- How to use:
 --
@@ -267,20 +268,37 @@ local BUTTON_SELECT = 1 << 13
 local BUTTON_Y = 1 << 14
 local BUTTON_B = 1 << 15
 
+local ITEM_VARIA = 1 << 1
+local ITEM_SPRING = 1 << 2
+local ITEM_MORPH = 1 << 3
+local ITEM_SCREW = 1 << 4
+local ITEM_GRAVITY = 1 << 6
+local ITEM_HIJUMP = 1 << 8
+local ITEM_SPACE = 1 << 9
+local ITEM_BOMBS = 1 << 12
+local ITEM_SPEED = 1 << 13
+local ITEM_GRAPPLE = 1 << 14
+local ITEM_XRAY = 1 << 15
+
 
 -----------------------------
 -- memory values
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
+local EXTRA_RUN_SPEED = 0
+local FX_POSITION = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
 local GRAPPLE_ANGLE = 0
 local GRAPPLE_FUNC = 0
 local GRAPPLE_SPEED = 0
 local IFRAMES = 0
+local INITIAL_Y_SPEED = {}
 local INPUT = 0
+local ITEMS_EQUIPPED = 0
 local KNOCKBACK = 0
+local LAVA_POSITION = 0
 local LIQUID_PHYSICS = 0
 local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
@@ -366,16 +384,30 @@ local function read_old_memory()
     OLD_SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
 end
 
+local function read_u16_le_array(res, address, length)
+    local bytes = memory.read_bytes_as_array(address, length * 2)
+    for i = 1, length do
+        res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
+    end
+end
+
 local function read_new_memory()
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
+    EXTRA_RUN_SPEED = (mainmemory.read_u16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
+    FX_POSITION = mainmemory.read_s32_le(0x195C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
     GRAPPLE_FUNC = mainmemory.read_u16_le(0x0D32)
     GRAPPLE_SPEED = mainmemory.read_s16_le(0x0D26)
     IFRAMES = mainmemory.read_u16_le(0x18A8)
+    if #INITIAL_Y_SPEED == 0 then
+        read_u16_le_array(INITIAL_Y_SPEED, 0x909EB9, 36)
+    end
     INPUT = mainmemory.read_u16_le(0x008B)
+    ITEMS_EQUIPPED = mainmemory.read_u16_le(0x09A2)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
+    LAVA_POSITION = mainmemory.read_s32_le(0x1962)
     LIQUID_PHYSICS = mainmemory.read_u16_le(0x0AD2)
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
@@ -402,25 +434,18 @@ local function read_new_memory()
     SPARK_TIMER = mainmemory.read_u16_le(0x0A68)
     WEAPON_COOLDOWN = mainmemory.read_u16_le(0x0CCC)
 
-    local function read_u16_le_array(res, address, length)
-        local bytes = mainmemory.read_bytes_as_array(address, length * 2)
-        for i = 1, length do
-            res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
-        end
-    end
-
-    read_u16_le_array(PROJECTILES_X, 0x0B64, 10)
-    read_u16_le_array(PROJECTILES_Y, 0x0B78, 10)
-    read_u16_le_array(PROJECTILES_RADIUS_X, 0x0BB4, 10)
-    read_u16_le_array(PROJECTILES_RADIUS_Y, 0x0BC8, 10)
-    read_u16_le_array(BOMB_TIMERS, 0x0C7C, 10)
+    read_u16_le_array(PROJECTILES_X, 0x7E0B64, 10)
+    read_u16_le_array(PROJECTILES_Y, 0x7E0B78, 10)
+    read_u16_le_array(PROJECTILES_RADIUS_X, 0x7E0BB4, 10)
+    read_u16_le_array(PROJECTILES_RADIUS_Y, 0x7E0BC8, 10)
+    read_u16_le_array(BOMB_TIMERS, 0x7E0C7C, 10)
 
     ENEMY_COUNT = mainmemory.read_u8(0x0E4E)
     read_enemy_data(ENEMY_DATA)
 
-    read_u16_le_array(ENEMY_PROJECTILE_IDS, 0x1997, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_XS, 0x1A4B, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_YS, 0x1A93, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_IDS, 0x7E1997, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_XS, 0x7E1A4B, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
 end
 
@@ -428,6 +453,43 @@ local function gameplay()
     -- TODO return false during pause
     return (0x08 <= GAME_STATE and GAME_STATE <= 0x12) or
         GAME_STATE == 0x2A
+end
+
+-- 0=air, 1=water, 2=lava/acid
+local function liquid_physics(bottom_y)
+    bottom_y = bottom_y or (SAMUS_Y >> 16) + SAMUS_RADIUS_Y
+    if ITEMS_EQUIPPED & ITEM_GRAVITY then
+        return 0
+    end
+    if FX_POSITION >= 0 and bottom_y < (FX_POSITION >> 16) then
+        return 1
+    elseif LAVA_POSITION >= 0 and bottom_y < (LAVA_POSITION >> 16) then
+        return 2
+    else
+        return 0
+    end
+end
+
+local function predict_jump_speed()
+    if 0x12 < SAMUS_POSE then
+        return nil
+    end
+
+    local speed_ptr = 1 + liquid_physics()
+    if ITEMS_EQUIPPED & ITEM_HIJUMP ~= 0 then
+        speed_ptr = speed_ptr + 6
+    end
+    local subspeed_ptr = speed_ptr + 3
+
+    local speed = INITIAL_Y_SPEED[speed_ptr]
+    local subspeed = INITIAL_Y_SPEED[subspeed_ptr]
+
+    if ITEMS_EQUIPPED & ITEM_SPEED ~= 0 then
+        speed = speed + (EXTRA_RUN_SPEED >> 17)
+        subspeed = (subspeed + (EXTRA_RUN_SPEED & 0xFFFF)) & 0xFFFF
+    end
+
+    return (speed << 16) | subspeed
 end
 
 local function samus_displacement()
@@ -1050,6 +1112,21 @@ local function draw_hud(samus_dx, samus_dy)
         gui.text(x, y, text, color)
     end
 
+    local function draw_jump_speed(x, y)
+        local jump_speed = predict_jump_speed()
+        local text
+        if jump_speed then
+            text = string.format("Jump:%4d.%05d", jump_speed >> 16, jump_speed & 0xFFFF)
+        else
+            text = "Jump:   -.-----"
+        end
+        local color
+        if not jump_speed then
+            color = HUD_COLOR_LO
+        end
+        gui.text(x, y, text, color)
+    end
+
     draw_samus_dx(HUD_COLUMN_0, HUD_ROW_0)
     draw_samus_dy(HUD_COLUMN_0, HUD_ROW_1)
     draw_samus_x(HUD_COLUMN_0, HUD_ROW_2)
@@ -1064,6 +1141,8 @@ local function draw_hud(samus_dx, samus_dy)
     draw_knockback_iframes(HUD_COLUMN_1, HUD_ROW_3)
     draw_speed_level(HUD_COLUMN_1, HUD_ROW_4)
     draw_spark_timer(HUD_COLUMN_1, HUD_ROW_5)
+
+    draw_jump_speed(HUD_COLUMN_2, HUD_ROW_1)
 end
 
 event.onframestart(read_old_memory)
