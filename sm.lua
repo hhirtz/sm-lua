@@ -930,37 +930,30 @@ local function draw_door_lag()
     local sum = _dlag_scroll + _dlag_sound + _dlag_elevator + _dlag_moving_up
     local lag_msg
     if _dlag_seen_transition_start then
-        lag_msg = string.format("Door lag:%3d", sum)
+        lag_msg = string.format("Door lag =%3d", sum)
     else
-        lag_msg = string.format("Door lag >%2d", sum)
+        lag_msg = string.format("Door lag >%3d", sum)
     end
-    -- TODO use table.concat
-    local sep = " ("
+    local breakdown = {}
     if _dlag_elevator ~= 0 then
-        lag_msg = lag_msg .. sep .. string.format("elevator =%2d", _dlag_elevator)
-        sep = "; "
+        breakdown[#breakdown + 1] = string.format("elevator=%d", _dlag_elevator)
     end
     if _dlag_sound ~= 0 then
-        lag_msg = lag_msg .. sep .. string.format("sound =%2d", _dlag_sound)
-        sep = "; "
+        breakdown[#breakdown + 1] = string.format("sound=%d", _dlag_sound)
     end
     if _dlag_scroll ~= 0 then
-        lag_msg = lag_msg .. sep .. string.format("scroll =%2d", _dlag_scroll)
-        sep = "; "
+        breakdown[#breakdown + 1] = string.format("scroll=%d", _dlag_scroll)
     end
     if _dlag_moving_up ~= 0 then
-        lag_msg = lag_msg .. sep .. string.format("fix up =%2d", _dlag_moving_up)
-        sep = "; "
+        breakdown[#breakdown + 1] = string.format("moving_up=%d", _dlag_moving_up)
     end
-    if sep == "; " then
-        sep = ")"
-    else
-        sep = ""
+    if #breakdown ~= 0 then
+        lag_msg = lag_msg .. " (" .. table.concat(breakdown, ", ") .. ")"
     end
     if _dlag_seen_transition_end then
-        lag_msg = lag_msg .. sep .. " (done)"
+        lag_msg = lag_msg .. " (done)"
     else
-        lag_msg = lag_msg .. sep .. " (in progress)"
+        lag_msg = lag_msg .. " (in progress)"
     end
     gui.text(0, 0, lag_msg, HUD_COLOR_HI, "bottomleft")
 end
