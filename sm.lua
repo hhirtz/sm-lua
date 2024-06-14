@@ -594,8 +594,8 @@ local function draw_enemy_projectile_hitboxes()
 end
 
 -- Build and cache slope polygons
--- polygon from slope S is stored at _SLOPES[4 * S + 2 * flip_y + flip_x + 1]
-local _SLOPES = {}
+-- polygon from slope S is stored at SLOPES[4 * S + 2 * flip_y + flip_x + 1]
+local SLOPES = {}
 local function build_slopes()
     local slope_data = memory.read_bytes_as_array(0x948B2B, 0x20 << 4)
 
@@ -656,14 +656,14 @@ local function build_slopes()
     end
 
     for i = 0, 0x1F do
-        _SLOPES[#_SLOPES + 1] = build_slope(i, false, false)
-        _SLOPES[#_SLOPES + 1] = build_slope(i, true, false)
-        _SLOPES[#_SLOPES + 1] = build_slope(i, false, true)
-        _SLOPES[#_SLOPES + 1] = build_slope(i, true, true)
+        SLOPES[#SLOPES + 1] = build_slope(i, false, false)
+        SLOPES[#SLOPES + 1] = build_slope(i, true, false)
+        SLOPES[#SLOPES + 1] = build_slope(i, false, true)
+        SLOPES[#SLOPES + 1] = build_slope(i, true, true)
     end
 end
 
-local _SIMPLE_OUTLINES = {
+local SIMPLE_OUTLINES = {
     0x00000000,         -- 0x00: air
     false,
     0x00000000,         -- 0x02: spike air
@@ -682,19 +682,16 @@ local _SIMPLE_OUTLINES = {
     TILE_COLOR_SPECIAL, -- 0x0F: bombable block
 }
 local function get_bts(global_index, line_index, line_bts)
-    local res
-    if line_bts then
-        res = line_bts[line_index]
-    end
-    return res or memory.read_u8(0x7F6402 + global_index)
+    return (line_bts and line_bts[line_index]) or
+        memory.read_u8(0x7F6402 + global_index)
 end
-local _COMPLEX_OUTLINES
-_COMPLEX_OUTLINES = {
+local COMPLEX_OUTLINES
+COMPLEX_OUTLINES = {
     -- slope
     [0x01] = function(global_index, line_index, _, line_bts, _)
         local bts = get_bts(global_index, line_index, line_bts)
         local slope_index = ((bts & 0x1F) << 2) | ((bts & 0xC0) >> 6)
-        return _SLOPES[slope_index + 1]
+        return SLOPES[slope_index + 1]
     end,
 
     -- horizontal extension
@@ -709,8 +706,8 @@ _COMPLEX_OUTLINES = {
         end
         local extension_index = global_index + u8_to_s8(bts)
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
-        return _SIMPLE_OUTLINES[block_type + 1] or
-            _COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
+        return SIMPLE_OUTLINES[block_type + 1] or
+            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
     end,
 
     -- shootable block
@@ -735,8 +732,8 @@ _COMPLEX_OUTLINES = {
         end
         local extension_index = global_index + u8_to_s8(bts) * ROOM_WIDTH
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
-        return _SIMPLE_OUTLINES[block_type + 1] or
-            _COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
+        return SIMPLE_OUTLINES[block_type + 1] or
+            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
     end,
 }
 
@@ -751,24 +748,24 @@ local function draw_blocks()
         return
     end
 
-    if #_SLOPES == 0 then
+    if #SLOPES == 0 then
         build_slopes()
     end
 
-    local screen_x_offset = SCREEN_X & 0x0F
-    local screen_y_offset = SCREEN_Y & 0x0F
+    local block_x_offset = SCREEN_X & 0x0F
+    local block_y_offset = SCREEN_Y & 0x0F
     local screen_offset = (SCREEN_Y >> 4) * ROOM_WIDTH + (SCREEN_X >> 4)
     for y = 0, 14 do
-        local block_y = (y << 4) - screen_y_offset
+        local block_y = (y << 4) - block_y_offset
         local index_offset = screen_offset + y * ROOM_WIDTH
         local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), 34)
         local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, 17)
         for x = 0, 16 do
-            local block_x = (x << 4) - screen_x_offset
+            local block_x = (x << 4) - block_x_offset
             local line_index = x + 1
             local block_type = line_data[line_index << 1] >> 4
-            local block = _SIMPLE_OUTLINES[block_type + 1] or
-                _COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
+            local block = SIMPLE_OUTLINES[block_type + 1] or
+                COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
             if type(block) == "number" then
                 if block ~= 0 then
                     gui.drawRectangle(block_x, block_y, 15, 15, block)
