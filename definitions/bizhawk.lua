@@ -28,6 +28,9 @@ function emu.frameadvance() end
 ---@nodiscard
 function emu.framecount() end
 
+---@param value? boolean
+function emu.setislagged(value) end
+
 ---@class (exact) event
 event = {}
 
@@ -224,3 +227,10 @@ function memory.write_u16_le(address, value, domain) end
 ---@param value integer
 ---@param domain? string
 function memory.write_s16_le(address, value, domain) end
+
+---@class (exact) tastudio
+tastudio = {}
+
+---@param frame integer
+---@param value? boolean
+function tastudio.setlag(frame, value) end
