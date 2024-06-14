@@ -7,6 +7,7 @@
 --  - Armpump and slope speed interference detection
 --  - Grapple swing speed prediction
 --  - Door lag
+--  - mark door transitions as lag in tastudio
 --
 -- How to use:
 --
@@ -851,6 +852,12 @@ local function draw_door_lag()
     gui.text(0, 0, lag_msg, HUD_COLOR_HI, "bottomleft")
 end
 
+local function mark_door_transitions_as_lag()
+    if GAME_STATE == 0x0B then
+        tastudio.setlag(FRAME_NO, true)
+    end
+end
+
 local function draw_hud(samus_dx, samus_dy)
     local function draw_samus_x(x, y)
         local text = string.format("x:%7d.%05d", SAMUS_X >> 16, SAMUS_X & 0xFFFF)
@@ -1040,5 +1047,6 @@ while true do
         draw_enemy_projectile_hitboxes()
         draw_hud(samus_dx, samus_dy)
         draw_door_lag()
+        mark_door_transitions_as_lag()
     end
 end
