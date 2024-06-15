@@ -21,6 +21,7 @@
 
 local clock_ns = package.loadlib("./libbench.so", "clock_ns")
 
+-- Create a new benchmark (or streaming statistic) with an optional name.
 local function new(name)
     local b = {
         name = name or "Bench",
@@ -29,8 +30,10 @@ local function new(name)
         mean2 = 0.0,
         min = 1 / 0,
         max = -1 / 0,
+        print_count = 0,
     }
 
+    -- Add a value to the statistic.
     function b.push(value)
         if value < b.min then
             b.min = value
@@ -46,18 +49,31 @@ local function new(name)
         b.mean2 = b.mean2 + delta * delta2
     end
 
+    -- Start timing a portion of code.
     function b.start_timing()
         b.t_start = clock_ns()
     end
 
-    function b.end_timing()
+    -- Time the portion of code after the last `start_timing` call.
+    -- Optional `n` argument to specify an amount of items processed, when
+    -- measuring throughput.
+    function b.end_timing(n)
+        n = n or 1
         local t_end = clock_ns()
-        local msec = (t_end - b.t_start) / 1000000
+        local msec = (t_end - b.t_start) / 1000000 / n
         b.push(msec)
     end
 
+    -- Print stat info:
+    --  - count: the number of values pushed
+    --  - range: [min value; max value]
+    --  - mean: mean/average
+    --  - var: variance
+    -- Optional `modulo` argument to actually print every `modulo` times this is
+    -- called, to avoid console lag.
     function b.print(modulo)
-        if modulo and b.count % modulo ~= 0 then
+        b.print_count = b.print_count + 1
+        if modulo and b.print_count % modulo ~= 0 then
             return
         end
         local variance = 0.0
