@@ -855,7 +855,7 @@ local function draw_slopekiller_line()
     -- Up press lag: samus falls at full speed for one frame
     local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
 
-    local unmorph_length = 6
+    local unmorph_length = 6 -- TODO don't hardcode it
     local accel_y = SAMUS_Y_ACCEL_AIR
     if LIQUID_PHYSICS == 1 then
         unmorph_length = 12
