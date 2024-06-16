@@ -133,6 +133,9 @@ function gui.drawRectangle(x, y, width, height, fg, bg, surfacename) end
 ---@param anchor? "topleft" | "topright" | "bottomleft" | "bottomright"
 function gui.text(x, y, message, fg, anchor) end
 
+---@param name string
+function gui.use_surface(name) end
+
 ---@class (exact) input
 input = {}
 
