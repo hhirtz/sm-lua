@@ -1145,11 +1145,18 @@ event.onexit(function()
 end)
 while true do
     repeat
+        -- don't run when seeking
+
+        -- double call to isseeking to avoid false positives
+        -- when loading a savestate in tastudio.
+        local was_seeking = client.isseeking()
+
         emu.frameadvance()
         gui.clearGraphics()
         gui.cleartext()
+
         mark_door_transitions_as_lag()
-    until not client.isseeking()
+    until not (was_seeking and client.isseeking())
 
     read_new_memory()
 
