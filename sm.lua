@@ -959,7 +959,7 @@ local function draw_door_lag()
 end
 
 local function mark_door_transitions_as_lag()
-    if GAME_STATE == 0x0B then
+    if OLD_GAME_STATE == 0x0B or GAME_STATE == 0x0B then
         tastudio.setlag(FRAME_NO, true)
     end
 end
@@ -1148,6 +1148,7 @@ while true do
         emu.frameadvance()
         gui.clearGraphics()
         gui.cleartext()
+        mark_door_transitions_as_lag()
     until not client.isseeking()
 
     read_new_memory()
@@ -1171,6 +1172,5 @@ while true do
         draw_enemy_projectile_hitboxes()
         draw_hud(samus_dx, samus_dy)
         draw_door_lag()
-        mark_door_transitions_as_lag()
     end
 end
