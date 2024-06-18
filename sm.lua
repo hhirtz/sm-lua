@@ -930,9 +930,9 @@ local function draw_door_lag()
     local sum = _dlag_scroll + _dlag_sound + _dlag_elevator + _dlag_moving_up
     local lag_msg
     if _dlag_seen_transition_start then
-        lag_msg = string.format("Door lag =%3d", sum)
+        lag_msg = string.format("Door lag=%2d", sum)
     else
-        lag_msg = string.format("Door lag >%3d", sum)
+        lag_msg = string.format("Door lag>%2d", sum)
     end
     local breakdown = {}
     if _dlag_elevator ~= 0 then
