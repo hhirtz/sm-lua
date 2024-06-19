@@ -528,7 +528,7 @@ local function draw_speed_percent(samus_dx, samus_dy)
     local x = (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X
     local y = (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y
     local textpos = client.transformPoint(x, y)
-    local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *0x0B4A
+    local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *$0B4A and *$0A6C
     local dx_ratio = samus_dx / expected_dx * 100
     if dx_ratio == dx_ratio then
         -- dx_ratio is not NaN
@@ -957,6 +957,7 @@ local function draw_door_lag()
 end
 
 local function mark_door_transitions_as_lag()
+    -- TODO this is called before GAME_STATE is initialized
     if OLD_GAME_STATE == 0x0B or GAME_STATE == 0x0B then
         tastudio.setlag(FRAME_NO, true)
     end
