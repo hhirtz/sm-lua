@@ -343,6 +343,9 @@ local ENEMY_PROJECTILE_RADIUSES = {}
 
 -----------------------------
 -- other frame constants
+local SAMUS_DX = 0
+local SAMUS_DY = 0
+
 local FRAME_NO = 0
 local SEEKED = true
 
@@ -445,6 +448,9 @@ local function read_new_memory()
     read_u16_le_array(ENEMY_PROJECTILE_XS, 0x7E1A4B, 18)
     read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
+
+    SAMUS_DX = math.abs(SAMUS_X - OLD_SAMUS_X)
+    SAMUS_DY = math.abs(SAMUS_Y - OLD_SAMUS_Y)
 end
 
 local function gameplay()
@@ -490,12 +496,6 @@ local function predict_jump_speed()
     return (speed << 16) | subspeed
 end
 
-local function samus_displacement()
-    local samus_dx = math.abs(SAMUS_X - OLD_SAMUS_X)
-    local samus_dy = math.abs(SAMUS_Y - OLD_SAMUS_Y)
-    return samus_dx, samus_dy
-end
-
 local function draw_samus_hitbox()
     -- hitbox around samus
     local x = (SAMUS_X >> 16) - SCREEN_X
@@ -519,7 +519,7 @@ local function draw_samus_hitbox()
     end
 end
 
-local function draw_speed_percent(samus_dx, samus_dy)
+local function draw_speed_percent()
     if GRAPPLE_FUNC == 0xC79D then
         -- swinging with grapple
         return
@@ -529,18 +529,18 @@ local function draw_speed_percent(samus_dx, samus_dy)
     local y = (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y
     local textpos = client.transformPoint(x, y)
     local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *$0B4A and *$0A6C
-    local dx_ratio = samus_dx / expected_dx * 100
+    local dx_ratio = SAMUS_DX / expected_dx * 100
     if dx_ratio == dx_ratio then
         -- dx_ratio is not NaN
-        local expected_dx_msg = string.format("dx:%3.0f%%", samus_dx / expected_dx * 100)
+        local expected_dx_msg = string.format("dx:%3.0f%%", SAMUS_DX / expected_dx * 100)
         gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg)
     end
     local expected_dy = OLD_SAMUS_SPEED_Y -- TODO this only works for positive values
-    local dy_ratio = samus_dy / expected_dy * 100
+    local dy_ratio = SAMUS_DY / expected_dy * 100
     if dy_ratio == dy_ratio then
         -- dy_ratio is not NaN
         -- TODO show correct sign on moonfall
-        local expected_dy_msg = string.format("dy:%3.0f%%", samus_dy / expected_dy * 100)
+        local expected_dy_msg = string.format("dy:%3.0f%%", SAMUS_DY / expected_dy * 100)
         gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
     end
 end
@@ -963,7 +963,7 @@ local function mark_door_transitions_as_lag()
     end
 end
 
-local function draw_hud(samus_dx, samus_dy)
+local function draw_hud()
     local function draw_samus_x(x, y)
         local text = string.format("x:%7d.%05d", SAMUS_X >> 16, SAMUS_X & 0xFFFF)
         gui.text(x, y, text)
@@ -1014,9 +1014,9 @@ local function draw_hud(samus_dx, samus_dy)
         local text
         local color
         if OLD_SAMUS_X < SAMUS_X then
-            text = string.format("dx: >%4d.%05d", samus_dx >> 16, samus_dx & 0xFFFF)
+            text = string.format("dx: >%4d.%05d", SAMUS_DX >> 16, SAMUS_DX & 0xFFFF)
         elseif OLD_SAMUS_X > SAMUS_X then
-            text = string.format("dx: <%4d.%05d", samus_dx >> 16, samus_dx & 0xFFFF)
+            text = string.format("dx: <%4d.%05d", SAMUS_DX >> 16, SAMUS_DX & 0xFFFF)
         else
             text = string.format("dx:     0.00000")
             color = HUD_COLOR_LO
@@ -1028,9 +1028,9 @@ local function draw_hud(samus_dx, samus_dy)
         local text
         local color
         if OLD_SAMUS_Y < SAMUS_Y then
-            text = string.format("dy: v%4d.%05d", samus_dy >> 16, samus_dy & 0xFFFF)
+            text = string.format("dy: v%4d.%05d", SAMUS_DY >> 16, SAMUS_DY & 0xFFFF)
         elseif OLD_SAMUS_Y > SAMUS_Y then
-            text = string.format("dy: ^%4d.%05d", samus_dy >> 16, samus_dy & 0xFFFF)
+            text = string.format("dy: ^%4d.%05d", SAMUS_DY >> 16, SAMUS_DY & 0xFFFF)
         else
             text = string.format("dy:     0.00000")
             color = HUD_COLOR_LO
@@ -1167,16 +1167,15 @@ while true do
 
     if gameplay() then
         draw_blocks()
-        local samus_dx, samus_dy = samus_displacement()
         draw_samus_hitbox()
-        draw_speed_percent(samus_dx, samus_dy)
+        draw_speed_percent()
         draw_slopekiller_line()
         draw_projectile_hitboxes()
         draw_powerbomb_hitbox()
         draw_grapple_throw_speed()
         draw_enemy_hitboxes()
         draw_enemy_projectile_hitboxes()
-        draw_hud(samus_dx, samus_dy)
+        draw_hud()
         draw_door_lag()
     end
 end
