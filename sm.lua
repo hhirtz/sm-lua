@@ -20,9 +20,15 @@
 
 -----------------------------
 -- script settings
+
+-- padding in pixels, to show tiles and entities outside the game display
 local PADDING_X = 0
 local PADDING_Y = 0
+
+-- size of the font in pixels
 local GUI_FONT_SIZE = 16
+
+-- hud settings
 local HUD_COLOR_LO = 0xA0FFFFFF
 local HUD_COLOR_HI = 0xFFFFFF00
 local HUD_COLUMN_WIDTH = 164
@@ -38,6 +44,8 @@ local HUD_ROW_4 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 4)
 local HUD_ROW_5 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 5)
 local HUD_ROW_6 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 6)
 local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
+
+-- tile hitbox colors
 local TILE_COLOR_DOORCAP = 0xFFFF8000
 local TILE_COLOR_ERROR = 0xFFFF0000
 local TILE_COLOR_SLOPE = 0xA0FFFFFF
