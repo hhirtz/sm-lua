@@ -1167,20 +1167,6 @@ event.onexit(function()
 end)
 client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
 while true do
-    repeat
-        -- don't run when seeking
-
-        -- double call to isseeking to avoid false positives
-        -- when loading a savestate in tastudio.
-        local was_seeking = client.isseeking()
-
-        emu.frameadvance()
-        gui.clearGraphics()
-        gui.cleartext()
-
-        mark_door_transitions_as_lag()
-    until not (was_seeking and client.isseeking())
-
     read_new_memory()
 
     do
@@ -1202,4 +1188,18 @@ while true do
         draw_hud()
         draw_door_lag()
     end
+
+    repeat
+        -- don't run when seeking
+
+        mark_door_transitions_as_lag()
+
+        -- double call to isseeking to avoid false positives
+        -- when loading a savestate in tastudio.
+        local was_seeking = client.isseeking()
+
+        emu.frameadvance()
+        gui.clearGraphics()
+        gui.cleartext()
+    until not (was_seeking and client.isseeking())
 end
