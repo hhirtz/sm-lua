@@ -830,6 +830,11 @@ local function draw_blocks()
         build_slopes()
     end
 
+    local read_bytes_as_array = memory.read_bytes_as_array
+    local drawPolygon = gui.drawPolygon
+    local drawRectangle = gui.drawRectangle
+    local type = type
+
     local line_length = 17 + (PADDING_X >> 3)
     local block_x_offset = OFFSET_X & 0x0F
     local block_y_offset = OFFSET_Y & 0x0F
@@ -837,8 +842,8 @@ local function draw_blocks()
     for y = 0, 14 + (PADDING_Y >> 3) do
         local block_y = (y << 4) - block_y_offset
         local index_offset = screen_offset + y * ROOM_WIDTH
-        local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), line_length << 1)
-        local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, line_length)
+        local line_data = read_bytes_as_array(0x7F0002 + (index_offset << 1), line_length << 1)
+        local line_bts = read_bytes_as_array(0x7F6402 + index_offset, line_length)
         for x = 0, 16 + (PADDING_X >> 3) do
             local block_x = (x << 4) - block_x_offset
             local line_index = x + 1
@@ -847,10 +852,10 @@ local function draw_blocks()
                 COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
             if type(block) == "number" then
                 if block ~= 0 then
-                    gui.drawRectangle(block_x, block_y, 15, 15, block)
+                    drawRectangle(block_x, block_y, 15, 15, block)
                 end
             else -- type(block) == "table"
-                gui.drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
+                drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
             end
         end
     end
