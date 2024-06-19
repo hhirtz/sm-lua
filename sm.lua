@@ -20,6 +20,8 @@
 
 -----------------------------
 -- script settings
+local PADDING_X = 0
+local PADDING_Y = 0
 local GUI_FONT_SIZE = 16
 local HUD_COLOR_LO = 0xA0FFFFFF
 local HUD_COLOR_HI = 0xFFFFFF00
@@ -343,6 +345,8 @@ local ENEMY_PROJECTILE_RADIUSES = {}
 
 -----------------------------
 -- other frame constants
+local OFFSET_X = 0
+local OFFSET_Y = 0
 local SAMUS_DX = 0
 local SAMUS_DY = 0
 
@@ -352,6 +356,10 @@ local SEEKED = true
 
 -----------------------------
 -- actual code
+
+local function client_transformPoint(x, y)
+    return client.transformPoint(x - PADDING_X, y - PADDING_Y)
+end
 
 local function u8_to_s8(n)
     return (n & 0x7F) - (n & 0x80)
@@ -449,6 +457,8 @@ local function read_new_memory()
     read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
 
+    OFFSET_X = SCREEN_X - PADDING_X
+    OFFSET_Y = SCREEN_Y - PADDING_Y
     SAMUS_DX = math.abs(SAMUS_X - OLD_SAMUS_X)
     SAMUS_DY = math.abs(SAMUS_Y - OLD_SAMUS_Y)
 end
@@ -498,8 +508,8 @@ end
 
 local function draw_samus_hitbox()
     -- hitbox around samus
-    local x = (SAMUS_X >> 16) - SCREEN_X
-    local y = (SAMUS_Y >> 16) - SCREEN_Y
+    local x = (SAMUS_X >> 16) - OFFSET_X
+    local y = (SAMUS_Y >> 16) - OFFSET_Y
     local x1 = x - SAMUS_RADIUS_X
     local y1 = y - SAMUS_RADIUS_Y
     local x2 = x + SAMUS_RADIUS_X
@@ -525,9 +535,9 @@ local function draw_speed_percent()
         return
     end
 
-    local x = (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X
-    local y = (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y
-    local textpos = client.transformPoint(x, y)
+    local x = (SAMUS_X >> 16) - OFFSET_X - SAMUS_RADIUS_X
+    local y = (SAMUS_Y >> 16) - OFFSET_Y - SAMUS_RADIUS_Y
+    local textpos = client_transformPoint(x, y)
     local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *$0B4A and *$0A6C
     local dx_ratio = SAMUS_DX / expected_dx * 100
     if dx_ratio == dx_ratio then
@@ -548,8 +558,8 @@ end
 local function draw_projectile_hitboxes()
     for i = 1, 10 do
         if PROJECTILES_RADIUS_X[i] ~= 0 or PROJECTILES_RADIUS_Y[i] ~= 0 or BOMB_TIMERS[i] ~= 0 then
-            local x = PROJECTILES_X[i] - SCREEN_X
-            local y = PROJECTILES_Y[i] - SCREEN_Y
+            local x = PROJECTILES_X[i] - OFFSET_X
+            local y = PROJECTILES_Y[i] - OFFSET_Y
             local x1 = x - PROJECTILES_RADIUS_X[i]
             local y1 = y - PROJECTILES_RADIUS_Y[i]
             local x2 = x + PROJECTILES_RADIUS_X[i]
@@ -557,7 +567,7 @@ local function draw_projectile_hitboxes()
             gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
             if BOMB_TIMERS[i] ~= 0 then
-                local textpos = client.transformPoint(x1, y1)
+                local textpos = client_transformPoint(x1, y1)
                 gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, BOMB_TIMERS[i])
             end
         end
@@ -571,10 +581,10 @@ local function draw_powerbomb_hitbox()
 
     local radius_x = POWERBOMB_RADIUS >> 8
     local radius_y = (radius_x * 3) // 4
-    local x1 = POWERBOMB_X - radius_x - SCREEN_X
-    local y1 = POWERBOMB_Y - radius_y - SCREEN_Y
-    local x2 = POWERBOMB_X + radius_x - SCREEN_X
-    local y2 = POWERBOMB_Y + radius_y - SCREEN_Y
+    local x1 = POWERBOMB_X - radius_x - OFFSET_X
+    local y1 = POWERBOMB_Y - radius_y - OFFSET_Y
+    local x2 = POWERBOMB_X + radius_x - OFFSET_X
+    local y2 = POWERBOMB_Y + radius_y - OFFSET_Y
     gui.drawBox(x1, y1, x2, y2, 0xFF00FFFF, 0x35F00FFF)
 end
 
@@ -606,9 +616,9 @@ local function draw_grapple_throw_speed()
     local speed_x = u16_mul(rot_speed, math.abs(sin_h12))
     local going_left = SAMUS_DIRECTION_X == 4
 
-    local textpos = client.transformPoint(
-        (SAMUS_X >> 16) - SCREEN_X - SAMUS_RADIUS_X,
-        (SAMUS_Y >> 16) - SCREEN_Y - SAMUS_RADIUS_Y)
+    local textpos = client_transformPoint(
+        (SAMUS_X >> 16) - OFFSET_X - SAMUS_RADIUS_X,
+        (SAMUS_Y >> 16) - OFFSET_Y - SAMUS_RADIUS_Y)
 
     local horiz_dir = (going_left and "<") or ">"
     local vert_dir = (going_up and "^") or "v"
@@ -621,14 +631,14 @@ end
 local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
         if ENEMY_DATA[i].id ~= 0 then
-            local x1 = ENEMY_DATA[i].x - ENEMY_DATA[i].radius_x - SCREEN_X
-            local y1 = ENEMY_DATA[i].y - ENEMY_DATA[i].radius_y - SCREEN_Y
-            local x2 = ENEMY_DATA[i].x + ENEMY_DATA[i].radius_x - SCREEN_X
-            local y2 = ENEMY_DATA[i].y + ENEMY_DATA[i].radius_y - SCREEN_Y
+            local x1 = ENEMY_DATA[i].x - ENEMY_DATA[i].radius_x - OFFSET_X
+            local y1 = ENEMY_DATA[i].y - ENEMY_DATA[i].radius_y - OFFSET_Y
+            local x2 = ENEMY_DATA[i].x + ENEMY_DATA[i].radius_x - OFFSET_X
+            local y2 = ENEMY_DATA[i].y + ENEMY_DATA[i].radius_y - OFFSET_Y
 
             -- TODO extended sprite map
             gui.drawBox(x1, y1, x2, y2, 0xFFFF0000, 0x35FF0000)
-            local textpos = client.transformPoint(x1 + 1, y1 + 1)
+            local textpos = client_transformPoint(x1 + 1, y1 + 1)
             local text
             if ENEMY_DATA[i].iframes ~= 0 then
                 text = string.format("hp: %d/%d\ninv %d",
@@ -644,10 +654,10 @@ end
 local function draw_enemy_projectile_hitboxes()
     for i = 18, 1, -1 do
         if ENEMY_PROJECTILE_IDS[i] ~= 0 then
-            local x1 = ENEMY_PROJECTILE_XS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
-            local y1 = ENEMY_PROJECTILE_YS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
-            local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - SCREEN_X
-            local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - SCREEN_Y
+            local x1 = ENEMY_PROJECTILE_XS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - OFFSET_X
+            local y1 = ENEMY_PROJECTILE_YS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - OFFSET_Y
+            local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - OFFSET_X
+            local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - OFFSET_Y
             gui.drawBox(x1, y1, x2, y2, 0xFFFF8000, 0x35FF8000)
         end
     end
@@ -812,15 +822,16 @@ local function draw_blocks()
         build_slopes()
     end
 
-    local block_x_offset = SCREEN_X & 0x0F
-    local block_y_offset = SCREEN_Y & 0x0F
-    local screen_offset = (SCREEN_Y >> 4) * ROOM_WIDTH + (SCREEN_X >> 4)
-    for y = 0, 14 do
+    local line_length = 17 + (PADDING_X >> 3)
+    local block_x_offset = OFFSET_X & 0x0F
+    local block_y_offset = OFFSET_Y & 0x0F
+    local screen_offset = (OFFSET_Y // 16) * ROOM_WIDTH + (OFFSET_X // 16)
+    for y = 0, 14 + (PADDING_Y >> 3) do
         local block_y = (y << 4) - block_y_offset
         local index_offset = screen_offset + y * ROOM_WIDTH
-        local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), 34)
-        local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, 17)
-        for x = 0, 16 do
+        local line_data = memory.read_bytes_as_array(0x7F0002 + (index_offset << 1), line_length << 1)
+        local line_bts = memory.read_bytes_as_array(0x7F6402 + index_offset, line_length)
+        for x = 0, 16 + (PADDING_X >> 3) do
             local block_x = (x << 4) - block_x_offset
             local line_index = x + 1
             local block_type = line_data[line_index << 1] >> 4
@@ -875,9 +886,9 @@ local function draw_slopekiller_line()
 
     local y_hi = (y >> 16)
 
-    local y_line = y_hi - SCREEN_Y
+    local y_line = y_hi - OFFSET_Y
     gui.drawLine(0, y_line, 256, y_line, 0xFFFFFFFF)
-    local textpos = client.transformPoint(0, y_line - 1)
+    local textpos = client_transformPoint(0, y_line - 1)
     gui.text(0, textpos.y - GUI_FONT_SIZE, string.format("%d", y_hi))
 end
 
@@ -1142,6 +1153,7 @@ event.onexit(function()
     gui.clearGraphics()
     gui.cleartext()
 end)
+client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
 while true do
     repeat
         -- don't run when seeking
