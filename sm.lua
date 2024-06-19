@@ -590,11 +590,9 @@ local function draw_powerbomb_hitbox()
 
     local radius_x = POWERBOMB_RADIUS >> 8
     local radius_y = (radius_x * 3) // 4
-    local x1 = POWERBOMB_X - radius_x - OFFSET_X
-    local y1 = POWERBOMB_Y - radius_y - OFFSET_Y
-    local x2 = POWERBOMB_X + radius_x - OFFSET_X
-    local y2 = POWERBOMB_Y + radius_y - OFFSET_Y
-    gui.drawBox(x1, y1, x2, y2, 0xFF00FFFF, 0x35F00FFF)
+    local x = POWERBOMB_X - radius_x - OFFSET_X
+    local y = POWERBOMB_Y - radius_y - OFFSET_Y
+    gui.drawRectangle(x, y, radius_x << 1, radius_y << 1, 0xFF00FFFF, 0x35F00FFF)
 end
 
 local function draw_grapple_throw_speed()
