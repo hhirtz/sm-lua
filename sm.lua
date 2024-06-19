@@ -286,7 +286,6 @@ local ITEM_XRAY = 1 << 15
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
-local EXTRA_RUN_SPEED = 0
 local FX_POSITION = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
@@ -394,7 +393,6 @@ end
 local function read_new_memory()
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
-    EXTRA_RUN_SPEED = (mainmemory.read_u16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
     FX_POSITION = mainmemory.read_s32_le(0x195C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
@@ -416,12 +414,12 @@ local function read_new_memory()
     ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
-    SAMUS_DASH = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
+    SAMUS_DASH = (mainmemory.read_s16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
     SAMUS_RADIUS_X = mainmemory.read_u8(0x0AFE)
     SAMUS_RADIUS_Y = mainmemory.read_u8(0x0B00)
     SAMUS_SPEED_CAP_Y = SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
-    SAMUS_SPEED_X = (mainmemory.read_s16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
+    SAMUS_SPEED_X = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
     SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
     SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
     SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
@@ -485,8 +483,8 @@ local function predict_jump_speed()
     local subspeed = INITIAL_Y_SPEED[subspeed_ptr]
 
     if ITEMS_EQUIPPED & ITEM_SPEED ~= 0 then
-        speed = speed + (EXTRA_RUN_SPEED >> 17)
-        subspeed = (subspeed + (EXTRA_RUN_SPEED & 0xFFFF)) & 0xFFFF
+        speed = speed + (SAMUS_DASH >> 17)
+        subspeed = (subspeed + (SAMUS_DASH & 0xFFFF)) & 0xFFFF
     end
 
     return (speed << 16) | subspeed
