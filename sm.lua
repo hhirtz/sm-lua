@@ -374,7 +374,8 @@ local function u8_to_s8(n)
 end
 
 local function read_enemy_data(res)
-    local MAX_ENEMIES = 32
+    --local MAX_ENEMIES = 32
+    local MAX_ENEMIES = ENEMY_COUNT
     local bytes = mainmemory.read_bytes_as_array(0x0F78, 0x40 * MAX_ENEMIES)
     for i = 1, MAX_ENEMIES do
         local offset = (i - 1) * 0x40 + 1
