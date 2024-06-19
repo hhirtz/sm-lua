@@ -660,11 +660,12 @@ end
 local function draw_enemy_projectile_hitboxes()
     for i = 18, 1, -1 do
         if ENEMY_PROJECTILE_IDS[i] ~= 0 then
-            local x1 = ENEMY_PROJECTILE_XS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - OFFSET_X
-            local y1 = ENEMY_PROJECTILE_YS[i] - ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - OFFSET_Y
-            local x2 = ENEMY_PROJECTILE_XS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 1] - OFFSET_X
-            local y2 = ENEMY_PROJECTILE_YS[i] + ENEMY_PROJECTILE_RADIUSES[(i << 1) - 0] - OFFSET_Y
-            gui.drawBox(x1, y1, x2, y2, 0xFFFF8000, 0x35FF8000)
+            local radius_i = i << 1
+            local radius_x = ENEMY_PROJECTILE_RADIUSES[radius_i - 1]
+            local radius_y = ENEMY_PROJECTILE_RADIUSES[radius_i]
+            local x = ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
+            local y = ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
+            gui.drawRectangle(x, y, radius_x << 1, radius_y << 1, 0xFFFF8000, 0x35FF8000)
         end
     end
 end
