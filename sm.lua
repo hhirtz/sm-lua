@@ -759,15 +759,12 @@ local SIMPLE_OUTLINES = {
     TILE_COLOR_SPECIAL, -- 0x0E: grapple block
     TILE_COLOR_SPECIAL, -- 0x0F: bombable block
 }
-local function get_bts(global_index, line_index, line_bts)
-    return (line_bts and line_bts[line_index]) or
-        memory.read_u8(0x7F6402 + global_index)
-end
 local COMPLEX_OUTLINES
 COMPLEX_OUTLINES = {
     -- slope
     [0x01] = function(global_index, line_index, _, line_bts, _)
-        local bts = get_bts(global_index, line_index, line_bts)
+        local bts = (line_bts and line_bts[line_index]) or
+            memory.read_u8(0x7F6402 + global_index)
         local slope_index = ((bts & 0x1F) << 2) | ((bts & 0xC0) >> 6)
         return SLOPES[slope_index + 1]
     end,
@@ -777,7 +774,8 @@ COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = get_bts(global_index, line_index, line_bts)
+        local bts = (line_bts and line_bts[line_index]) or
+            memory.read_u8(0x7F6402 + global_index)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
@@ -790,7 +788,8 @@ COMPLEX_OUTLINES = {
 
     -- shootable block
     [0x0C] = function(global_index, line_index, _, line_bts, _)
-        local bts = get_bts(global_index, line_index, line_bts)
+        local bts = (line_bts and line_bts[line_index]) or
+            memory.read_u8(0x7F6402 + global_index)
         if 0x40 <= bts and bts <= 0x43 then
             return TILE_COLOR_DOORCAP
         else
@@ -803,7 +802,8 @@ COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = get_bts(global_index, line_index, line_bts)
+        local bts = (line_bts and line_bts[line_index]) or
+            memory.read_u8(0x7F6402 + global_index)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
