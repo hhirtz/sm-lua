@@ -22,6 +22,7 @@
 -- script settings
 
 -- padding in pixels, to show tiles and entities outside the game display
+-- this impacts performance
 local PADDING_X = 0
 local PADDING_Y = 0
 
@@ -1164,6 +1165,7 @@ event.onframestart(read_old_memory)
 event.onexit(function()
     gui.clearGraphics()
     gui.cleartext()
+    client.SetGameExtraPadding(0, 0, 0, 0)
 end)
 client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
 while true do
