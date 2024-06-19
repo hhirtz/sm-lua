@@ -762,7 +762,7 @@ local SIMPLE_OUTLINES = {
 local COMPLEX_OUTLINES
 COMPLEX_OUTLINES = {
     -- slope
-    [0x01] = function(global_index, line_index, _, line_bts, _)
+    [0x01] = function(global_index, line_index, line_bts, _)
         local bts = (line_bts and line_bts[line_index]) or
             memory.read_u8(0x7F6402 + global_index)
         local slope_index = ((bts & 0x1F) << 2) | ((bts & 0xC0) >> 6)
@@ -770,7 +770,7 @@ COMPLEX_OUTLINES = {
     end,
 
     -- horizontal extension
-    [0x05] = function(global_index, line_index, _, line_bts, stack_limit)
+    [0x05] = function(global_index, line_index, line_bts, stack_limit)
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
@@ -783,11 +783,11 @@ COMPLEX_OUTLINES = {
         local extension_index = global_index + u8_to_s8(bts)
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return SIMPLE_OUTLINES[block_type + 1] or
-            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
+            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, stack_limit - 1)
     end,
 
     -- shootable block
-    [0x0C] = function(global_index, line_index, _, line_bts, _)
+    [0x0C] = function(global_index, line_index, line_bts, _)
         local bts = (line_bts and line_bts[line_index]) or
             memory.read_u8(0x7F6402 + global_index)
         if 0x40 <= bts and bts <= 0x43 then
@@ -798,7 +798,7 @@ COMPLEX_OUTLINES = {
     end,
 
     -- vertical extension
-    [0x0D] = function(global_index, line_index, _, line_bts, stack_limit)
+    [0x0D] = function(global_index, line_index, line_bts, stack_limit)
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
@@ -811,7 +811,7 @@ COMPLEX_OUTLINES = {
         local extension_index = global_index + u8_to_s8(bts) * ROOM_WIDTH
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return SIMPLE_OUTLINES[block_type + 1] or
-            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, nil, stack_limit - 1)
+            COMPLEX_OUTLINES[block_type](extension_index, 0, nil, stack_limit - 1)
     end,
 }
 
@@ -849,7 +849,7 @@ local function draw_blocks()
             local line_index = x + 1
             local block_type = line_data[line_index << 1] >> 4
             local block = SIMPLE_OUTLINES[block_type + 1] or
-                COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_data, line_bts, 224)
+                COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_bts, 224)
             if type(block) == "number" then
                 if block ~= 0 then
                     drawRectangle(block_x, block_y, 15, 15, block)
