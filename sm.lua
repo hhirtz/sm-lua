@@ -637,21 +637,20 @@ end
 
 local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
-        if ENEMY_DATA[i].id ~= 0 then
-            local x1 = ENEMY_DATA[i].x - ENEMY_DATA[i].radius_x - OFFSET_X
-            local y1 = ENEMY_DATA[i].y - ENEMY_DATA[i].radius_y - OFFSET_Y
-            local x2 = ENEMY_DATA[i].x + ENEMY_DATA[i].radius_x - OFFSET_X
-            local y2 = ENEMY_DATA[i].y + ENEMY_DATA[i].radius_y - OFFSET_Y
+        local enemy = ENEMY_DATA[i]
+        if enemy.id ~= 0 then
+            local x = enemy.x - enemy.radius_x - OFFSET_X
+            local y = enemy.y - enemy.radius_y - OFFSET_Y
 
             -- TODO extended sprite map
-            gui.drawBox(x1, y1, x2, y2, 0xFFFF0000, 0x35FF0000)
-            local textpos = client_transformPoint(x1 + 1, y1 + 1)
+            gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
+            local textpos = client_transformPoint(x + 1, y + 1)
             local text
-            if ENEMY_DATA[i].iframes ~= 0 then
+            if enemy.iframes ~= 0 then
                 text = string.format("hp: %d/%d\ninv %d",
-                    ENEMY_DATA[i].health, ENEMY_DATA[i].max_health, ENEMY_DATA[i].iframes)
+                    enemy.health, enemy.max_health, enemy.iframes)
             else
-                text = string.format("hp: %d/%d", ENEMY_DATA[i].health, ENEMY_DATA[i].max_health)
+                text = string.format("hp: %d/%d", enemy.health, enemy.max_health)
             end
             gui.text(textpos.x, textpos.y, text)
         end
