@@ -2,7 +2,7 @@
 -- Super Metroid TAS script for Bizhawk 2.9
 --
 -- Features:
---  - Hitbox around samus, enemies, projectiles and blocks
+--  - Hitbox around samus, enemies, projectiles and blocks, with extra padding
 --  - RAM watches
 --  - Armpump and slope speed interference detection
 --  - Grapple swing speed prediction
