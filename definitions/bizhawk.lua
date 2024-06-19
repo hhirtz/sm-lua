@@ -13,6 +13,12 @@ function client.ispaused() end
 ---@nodiscard
 function client.isseeking() end
 
+---@param left integer
+---@param top integer
+---@param right integer
+---@param bottom integer
+function client.SetGameExtraPadding(left, top, right, bottom) end
+
 ---@param x integer
 ---@param y integer
 ---@return { x: integer, y: integer }
@@ -139,9 +145,13 @@ function gui.use_surface(name) end
 ---@class (exact) input
 input = {}
 
----@return any
+---@return table
 ---@nodiscard
 function input.get() end
+
+---@return { Left: boolean, Middle: boolean, Right: boolean, Wheel: integer, X: integer, XButton1: boolean, XButton2: boolean, Y: integer }
+---@nodiscard
+function input.getmouse() end
 
 ---@class (exact) mainmemory
 mainmemory = {}
