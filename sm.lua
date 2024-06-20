@@ -555,11 +555,10 @@ local function draw_speed_percent()
         local expected_dx_msg = string.format("dx:%3.0f%%", SAMUS_DX / expected_dx * 100)
         gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg)
     end
-    local expected_dy = OLD_SAMUS_SPEED_Y -- TODO this only works for positive values
+    local expected_dy = math.abs(OLD_SAMUS_SPEED_Y)
     local dy_ratio = SAMUS_DY / expected_dy * 100
     if dy_ratio == dy_ratio then
         -- dy_ratio is not NaN
-        -- TODO show correct sign on moonfall
         local expected_dy_msg = string.format("dy:%3.0f%%", SAMUS_DY / expected_dy * 100)
         gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
     end
