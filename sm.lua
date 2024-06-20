@@ -899,7 +899,7 @@ local function draw_slopekiller_line()
     local y_hi = (y >> 16)
 
     local y_line = y_hi - OFFSET_Y
-    gui.drawLine(0, y_line, 256, y_line, 0xFFFFFFFF)
+    gui.drawLine(0, y_line, 256 + 2 * PADDING_X, y_line, 0xFFFFFFFF)
     local textpos = client_transformPoint(0, y_line - 1)
     gui.text(0, textpos.y - GUI_FONT_SIZE, string.format("%d", y_hi))
 end
