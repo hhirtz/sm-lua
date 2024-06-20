@@ -999,7 +999,9 @@ local function draw_hud()
 
     local function draw_samus_speed_x(x, y)
         local format
-        if SAMUS_DIRECTION_X == 4 then
+        if SAMUS_DIRECTION_X == 0 then
+            format = "vx: |%4d.%05d"
+        elseif SAMUS_DIRECTION_X == 4 then
             format = "vx: <%4d.%05d"
         elseif SAMUS_DIRECTION_X == 8 then
             format = "vx: >%4d.%05d"
