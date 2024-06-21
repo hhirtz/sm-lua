@@ -34,6 +34,10 @@ function emu.frameadvance() end
 ---@nodiscard
 function emu.framecount() end
 
+---@return string?
+---@nodiscard
+function emu.getsystemid() end
+
 ---@param value? boolean
 function emu.setislagged(value) end
 
