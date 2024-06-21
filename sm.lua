@@ -50,7 +50,8 @@ local HUD_ROW_5 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 5)
 local HUD_ROW_6 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 6)
 local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
 
--- tile hitbox colors
+-- tile hitbox colors  0xAARRGGBB
+local TILE_COLOR_AIR = 0x00000000
 local TILE_COLOR_DOORCAP = 0xFFFF8000
 local TILE_COLOR_ERROR = 0xFFFF0000
 local TILE_COLOR_SLOPE = 0xA0FFFFFF
@@ -750,14 +751,14 @@ local function build_slopes()
 end
 
 local SIMPLE_OUTLINES = {
-    0x00000000,         -- 0x00: air
+    TILE_COLOR_AIR,     -- 0x00: air
     false,
-    0x00000000,         -- 0x02: spike air
+    TILE_COLOR_AIR,     -- 0x02: spike air
     TILE_COLOR_SPECIAL, -- 0x03: special air
-    0x00000000,         -- 0x04: shootable air
+    TILE_COLOR_AIR,     -- 0x04: shootable air
     false,
-    0x00000000,         -- 0x06: unused air
-    0x00000000,         -- 0x07: bombable air
+    TILE_COLOR_AIR,     -- 0x06: unused air
+    TILE_COLOR_AIR,     -- 0x07: bombable air
     TILE_COLOR_SOLID,   -- 0x08: solid block
     TILE_COLOR_SPECIAL, -- 0x09: door block
     TILE_COLOR_SPECIAL, -- 0x0A: spike block
