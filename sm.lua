@@ -22,9 +22,13 @@
 -- script settings
 
 -- padding in pixels, to show tiles and entities outside the game display
--- this impacts performance
-local PADDING_X = 0
-local PADDING_Y = 0
+-- this impacts performance. must be positive
+local PADDING_X = 64
+local PADDING_Y = 48
+
+-- whether to center on samus's hitbox instead of
+-- aligning hotboxes on the game screen
+local CENTER_SAMUS = false
 
 -- size of the font in pixels
 local GUI_FONT_SIZE = 16
@@ -467,8 +471,13 @@ local function read_new_memory()
     read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
 
-    OFFSET_X = SCREEN_X - PADDING_X
-    OFFSET_Y = SCREEN_Y - PADDING_Y
+    if CENTER_SAMUS then
+        OFFSET_X = (SAMUS_X >> 16) - 128 - PADDING_X
+        OFFSET_Y = (SAMUS_Y >> 16) - 112 - PADDING_Y
+    else
+        OFFSET_X = SCREEN_X - PADDING_X
+        OFFSET_Y = SCREEN_Y - PADDING_Y
+    end
     SAMUS_DX = math.abs(SAMUS_X - OLD_SAMUS_X)
     SAMUS_DY = math.abs(SAMUS_Y - OLD_SAMUS_Y)
 end
