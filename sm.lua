@@ -605,9 +605,9 @@ local function draw_powerbomb_hitbox()
 
     local radius_x = POWERBOMB_RADIUS >> 8
     local radius_y = (radius_x * 3) // 4
-    local x = POWERBOMB_X - radius_x - OFFSET_X
-    local y = POWERBOMB_Y - radius_y - OFFSET_Y
-    gui.drawRectangle(x, y, radius_x << 1, radius_y << 1, 0xFF00FFFF, 0x35F00FFF)
+    local x1 = POWERBOMB_X - radius_x - OFFSET_X
+    local y1 = POWERBOMB_Y - radius_y - OFFSET_Y
+    gui.drawRectangle(x1, y1, radius_x << 1, radius_y << 1, 0xFF00FFFF, 0x35F00FFF)
 end
 
 local function draw_grapple_throw_speed()
@@ -678,9 +678,9 @@ local function draw_enemy_projectile_hitboxes()
             local radius_i = i << 1
             local radius_x = ENEMY_PROJECTILE_RADIUSES[radius_i - 1]
             local radius_y = ENEMY_PROJECTILE_RADIUSES[radius_i]
-            local x = ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
-            local y = ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
-            gui.drawRectangle(x, y, radius_x << 1, radius_y << 1, 0xFFFF8000, 0x35FF8000)
+            local x1 = ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
+            local y1 = ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
+            gui.drawRectangle(x1, y1, radius_x << 1, radius_y << 1, 0xFFFF8000, 0x35FF8000)
         end
     end
 end
