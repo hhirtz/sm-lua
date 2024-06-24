@@ -380,24 +380,43 @@ local function u8_to_s8(n)
     return (n & 0x7F) - (n & 0x80)
 end
 
+local function read_u16_le_array(res, address, length)
+    local bytes = memory.read_bytes_as_array(address, length * 2)
+    for i = 1, length do
+        res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
+    end
+end
+
+local function read_bi_u16_le(address)
+    local u32 = memory.read_u32_le(address)
+    return u32 & 0xFFFF, u32 >> 16
+end
+
+local function read_u32_le_inv(address)
+    local u32 = memory.read_u32_le(address)
+    return ((u32 & 0xFFFF) << 16) | (u32 >> 16)
+end
+
+local function table_u16_le(t, i)
+    return (t[i]) | (t[i + 1] << 8)
+end
+
 local function read_enemy_data(res)
     --local MAX_ENEMIES = 32
     local MAX_ENEMIES = ENEMY_COUNT
-    local bytes = mainmemory.read_bytes_as_array(0x0F78, 0x40 * MAX_ENEMIES)
+    local bytes = mainmemory.read_bytes_as_array(0x0F78, MAX_ENEMIES << 6)
     for i = 1, MAX_ENEMIES do
         local offset = (i - 1) * 0x40 + 1
-        local id = bytes[offset]| (bytes[offset + 1] << 8)
         res[i] = {
-            id = id,
-            x = bytes[offset + 2]| (bytes[offset + 3] << 8),
+            id = table_u16_le(bytes, offset),
+            x = table_u16_le(bytes, offset + 2),
             -- skip subx
-            y = bytes[offset + 6]| (bytes[offset + 7] << 8),
+            y = table_u16_le(bytes, offset + 6),
             -- skip suby
-            radius_x = bytes[offset + 10]| (bytes[offset + 11] << 8),
-            radius_y = bytes[offset + 12]| (bytes[offset + 13] << 8),
-            health = bytes[offset + 20]| (bytes[offset + 21] << 8),
-            max_health = memory.read_u16_le(0xA00004 + id),
-            iframes = bytes[offset + 40]|(bytes[offset + 41] << 8),
+            radius_x = table_u16_le(bytes, offset + 10),
+            radius_y = table_u16_le(bytes, offset + 12),
+            health = table_u16_le(bytes, offset + 20),
+            iframes = table_u16_le(bytes, offset + 40),
         }
     end
 end
@@ -405,16 +424,9 @@ end
 local function read_old_memory()
     OLD_DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     OLD_GAME_STATE = mainmemory.read_u8(0x0998)
-    OLD_SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
-    OLD_SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
+    OLD_SAMUS_X = read_u32_le_inv(0x7E0AF6)
+    OLD_SAMUS_Y = read_u32_le_inv(0x7E0AFA)
     OLD_SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
-end
-
-local function read_u16_le_array(res, address, length)
-    local bytes = memory.read_bytes_as_array(address, length * 2)
-    for i = 1, length do
-        res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
-    end
 end
 
 local function read_new_memory()
@@ -436,20 +448,18 @@ local function read_new_memory()
     LIQUID_PHYSICS = mainmemory.read_u16_le(0x0AD2)
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
-    POWERBOMB_X = mainmemory.read_u16_le(0x0CE2)
-    POWERBOMB_Y = mainmemory.read_u16_le(0x0CE4)
+    POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
     ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
-    SAMUS_DASH = (mainmemory.read_s16_le(0x0B42) << 16) | mainmemory.read_u16_le(0x0B44)
+    SAMUS_DASH = read_u32_le_inv(0x7E0B42)
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
-    SAMUS_RADIUS_X = mainmemory.read_u8(0x0AFE)
-    SAMUS_RADIUS_Y = mainmemory.read_u8(0x0B00)
+    SAMUS_RADIUS_X, SAMUS_RADIUS_Y = read_bi_u16_le(0x7E0AFE)
     SAMUS_SPEED_CAP_Y = SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
-    SAMUS_SPEED_X = (mainmemory.read_u16_le(0x0B46) << 16) | mainmemory.read_u16_le(0x0B48)
+    SAMUS_SPEED_X = read_u32_le_inv(0x7E0B46)
     SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
-    SAMUS_X = (mainmemory.read_u16_le(0x0AF6) << 16) | mainmemory.read_u16_le(0x0AF8)
-    SAMUS_Y = (mainmemory.read_u16_le(0x0AFA) << 16) | mainmemory.read_u16_le(0x0AFC)
+    SAMUS_X = read_u32_le_inv(0x7E0AF6)
+    SAMUS_Y = read_u32_le_inv(0x7E0AFA)
     SAMUS_Y_ACCEL_AIR = SAMUS_Y_ACCEL_AIR or (memory.read_u16_le(0x909EA7) << 16) | memory.read_u16_le(0x909EA1)
     SAMUS_Y_ACCEL_LAVA = SAMUS_Y_ACCEL_LAVA or (memory.read_u16_le(0x909EAB) << 16) | memory.read_u16_le(0x909EA5)
     SAMUS_Y_ACCEL_WATER = SAMUS_Y_ACCEL_WATER or (memory.read_u16_le(0x909EA9) << 16) | memory.read_u16_le(0x909EA3)
