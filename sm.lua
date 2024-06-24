@@ -1202,9 +1202,8 @@ event.onexit(function()
     client.SetGameExtraPadding(0, 0, 0, 0)
 end)
 client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
+read_new_memory()
 while true do
-    read_new_memory()
-
     do
         local new_frame_no = emu.framecount()
         SEEKED = new_frame_no ~= FRAME_NO + 1
@@ -1237,5 +1236,7 @@ while true do
         emu.frameadvance()
         gui.clearGraphics()
         gui.cleartext()
+
+        read_new_memory()
     until not (was_seeking and client.isseeking())
 end
