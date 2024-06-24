@@ -303,6 +303,8 @@ local ITEM_XRAY = 1 << 15
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
+local ENEMY_DROP_CHANCES = nil
+local ENEMY_HEADERS = nil
 local FX_POSITION = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
@@ -320,17 +322,29 @@ local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
+local RANDOM = 0
 local ROOM_WIDTH = 0
 local SAMUS_DASH = 0
 local SAMUS_DIRECTION_X = 0
 local SAMUS_DIRECTION_Y = 0
+local SAMUS_HEALTH = 0
+local SAMUS_HEALTH_BOMB = 0
+local SAMUS_HEALTH_MAX = 0
+local SAMUS_HEALTH_RESERVE = 0
+local SAMUS_HEALTH_RESERVE_MAX = 0
+local SAMUS_MISSILES = 0
+local SAMUS_MISSILES_MAX = 0
 local SAMUS_POSE = 0
+local SAMUS_POWERBOMBS = 0
+local SAMUS_POWERBOMBS_MAX = 0
 local SAMUS_RADIUS_X = 0
 local SAMUS_RADIUS_Y = 0
 local SAMUS_SPEED_CAP_Y = nil
 local SAMUS_SPEED_X = 0
 local SAMUS_SPEED_Y = 0
 local OLD_SAMUS_SPEED_Y = 0
+local SAMUS_SUPERS = 0
+local SAMUS_SUPERS_MAX = 0
 local SAMUS_X = 0
 local OLD_SAMUS_X = 0
 local SAMUS_Y = 0
@@ -401,6 +415,20 @@ local function table_u16_le(t, i)
     return (t[i]) | (t[i + 1] << 8)
 end
 
+local function read_enemy_headers()
+    local bytes = memory.read_bytes_as_array(0xA0CEBF, 8832)
+    local res = {}
+    for i = 1, 138 do
+        local offset = (i - 1) * 0x40 + 1
+        local drop_chances = table_u16_le(bytes, offset + 0x3A)
+        res[i] = {
+            max_health = table_u16_le(bytes, offset + 0x04),
+            drop_chances = drop_chances ~= 0 and (drop_chances - 0xF1F3) or nil,
+        }
+    end
+    return res
+end
+
 local function read_enemy_data(res)
     --local MAX_ENEMIES = 32
     local MAX_ENEMIES = ENEMY_COUNT
@@ -432,6 +460,8 @@ end
 local function read_new_memory()
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
+    ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
+    ENEMY_HEADERS = ENEMY_HEADERS or read_enemy_headers()
     FX_POSITION = mainmemory.read_s32_le(0x195C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
@@ -449,15 +479,22 @@ local function read_new_memory()
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
+    RANDOM = mainmemory.read_u16_le(0x05E5)
     ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
+    SAMUS_HEALTH, SAMUS_HEALTH_MAX = read_bi_u16_le(0x7E09C2)
+    SAMUS_HEALTH_BOMB = mainmemory.read_u16_le(0x0E1A)
+    SAMUS_HEALTH_RESERVE_MAX, SAMUS_HEALTH_RESERVE = read_bi_u16_le(0x7E09D4)
     SAMUS_DASH = read_u32_le_inv(0x7E0B42)
+    SAMUS_MISSILES, SAMUS_MISSILES_MAX = read_bi_u16_le(0x7E09C6)
     SAMUS_POSE = mainmemory.read_u8(0x0A1C)
+    SAMUS_POWERBOMBS, SAMUS_POWERBOMBS_MAX = read_bi_u16_le(0x7E09CE)
     SAMUS_RADIUS_X, SAMUS_RADIUS_Y = read_bi_u16_le(0x7E0AFE)
     SAMUS_SPEED_CAP_Y = SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
     SAMUS_SPEED_X = read_u32_le_inv(0x7E0B46)
     SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
+    SAMUS_SUPERS, SAMUS_SUPERS_MAX = read_bi_u16_le(0x7E08CA)
     SAMUS_X = read_u32_le_inv(0x7E0AF6)
     SAMUS_Y = read_u32_le_inv(0x7E0AFA)
     SAMUS_Y_ACCEL_AIR = SAMUS_Y_ACCEL_AIR or (memory.read_u16_le(0x909EA7) << 16) | memory.read_u16_le(0x909EA1)
@@ -498,6 +535,12 @@ local function gameplay()
     -- TODO return false during pause
     return (0x08 <= GAME_STATE and GAME_STATE <= 0x12) or
         GAME_STATE == 0x2A
+end
+
+local function next_random(prev)
+    -- ref: 80:8111
+    local next = ((prev * 5) & 0xFFFF) + 0x100
+    return (next + 0x11 + (next >> 16)) & 0xFFFF
 end
 
 -- 0=air, 1=water, 2=lava/acid
@@ -660,6 +703,85 @@ local function draw_grapple_throw_speed()
     gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, text)
 end
 
+local DROP_NAMES = {
+    "sl energy",
+    "bg energy",
+    "missile",
+    "nothing",
+    "super",
+    "powerbomb",
+}
+local function predict_enemy_drop(drop_chances_idx)
+    -- ref: 86:F106
+
+    -- TODO see 86:EEAF and 86:EF29
+
+    local small_energy = ENEMY_DROP_CHANCES[drop_chances_idx]
+    local big_energy = ENEMY_DROP_CHANCES[drop_chances_idx + 1]
+    local missile = ENEMY_DROP_CHANCES[drop_chances_idx + 2]
+    local nothing = ENEMY_DROP_CHANCES[drop_chances_idx + 3]
+    local super = ENEMY_DROP_CHANCES[drop_chances_idx + 4]
+    local powerbomb = ENEMY_DROP_CHANCES[drop_chances_idx + 5]
+
+    local random
+    repeat
+        random = next_random(RANDOM)
+    until random ~= 0
+    random = random & 0xFF
+
+    local health_bomb = (SAMUS_HEALTH + SAMUS_HEALTH_RESERVE < 30) or
+        (SAMUS_HEALTH + SAMUS_HEALTH_RESERVE < 50 and SAMUS_HEALTH_BOMB)
+
+    local enabled_drops = 0
+    local pooled_minors_chance = 0
+    local pooled_majors_chance = 0xFF
+    if health_bomb then
+        enabled_drops = 0x03
+        pooled_minors_chance = small_energy + big_energy
+    else
+        enabled_drops = 0x08
+        pooled_minors_chance = nothing
+        if SAMUS_HEALTH ~= SAMUS_HEALTH_MAX or SAMUS_HEALTH_RESERVE ~= SAMUS_HEALTH_RESERVE_MAX then
+            enabled_drops = enabled_drops | 0x03
+            pooled_minors_chance = pooled_minors_chance + small_energy + big_energy
+        end
+        if SAMUS_MISSILES ~= SAMUS_MISSILES_MAX then
+            enabled_drops = enabled_drops | 0x04
+            pooled_minors_chance = pooled_minors_chance + missile
+        end
+        if SAMUS_SUPERS ~= SAMUS_SUPERS_MAX then
+            enabled_drops = enabled_drops | 0x10
+            pooled_majors_chance = pooled_majors_chance - super
+        end
+        if SAMUS_POWERBOMBS ~= SAMUS_POWERBOMBS_MAX then
+            enabled_drops = enabled_drops | 0x20
+            pooled_majors_chance = pooled_majors_chance - powerbomb
+        end
+    end
+
+    local drop_chance_acc = 0
+    if pooled_minors_chance ~= 0 then
+        for i = 0, 3 do
+            if enabled_drops & (1 << i) ~= 0 then
+                drop_chance_acc = drop_chance_acc +
+                    ((ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_chance) & 0xFF) // pooled_minors_chance
+                if drop_chance_acc >= random then
+                    return i
+                end
+            end
+        end
+    end
+    for i = 4, 5 do
+        if enabled_drops & (1 << i) ~= 0 then
+            drop_chance_acc = drop_chance_acc + ENEMY_DROP_CHANCES[drop_chances_idx + i]
+            if drop_chance_acc >= random then
+                return i
+            end
+        end
+    end
+    return 3
+end
+
 local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
         local enemy = ENEMY_DATA[i]
@@ -669,13 +791,25 @@ local function draw_enemy_hitboxes()
 
             -- TODO extended sprite map
             gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
+
+            -- TODO make it work with bosses
+            local enemy_header = ENEMY_HEADERS[((enemy.id - 0xCEBF) >> 6) + 1]
+            local drop = "nothing"
+            if enemy_header and enemy_header.drop_chances then
+                -- TODO show timer until drop appears
+                drop = DROP_NAMES[predict_enemy_drop(enemy_header.drop_chances) + 1]
+            end
+
+            local max_health = enemy_header and enemy_header.max_health or 0
+
             local textpos = client_transformPoint(x + 1, y + 1)
             local text
             if enemy.iframes ~= 0 then
-                text = string.format("hp: %d/%d\ninv %d",
-                    enemy.health, enemy.max_health, enemy.iframes)
+                text = string.format("hp: %d/%d\ndrop: %s\ninv: %d",
+                    enemy.health, max_health, drop, enemy.iframes)
             else
-                text = string.format("hp: %d/%d", enemy.health, enemy.max_health)
+                text = string.format("hp: %d/%d\ndrop: %s",
+                    enemy.health, max_health, drop)
             end
             gui.text(textpos.x, textpos.y, text)
         end
