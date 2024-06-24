@@ -52,6 +52,7 @@ local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
 
 -- tile hitbox colors  0xAARRGGBB
 local TILE_COLOR_AIR = 0x00000000
+local TILE_COLOR_DOOR = 0xFF8080FF
 local TILE_COLOR_DOORCAP = 0xFFFF8000
 local TILE_COLOR_ERROR = 0xFFFF0000
 local TILE_COLOR_SLOPE = 0xA0FFFFFF
@@ -760,7 +761,7 @@ local SIMPLE_OUTLINES = {
     TILE_COLOR_AIR,     -- 0x06: unused air
     TILE_COLOR_AIR,     -- 0x07: bombable air
     TILE_COLOR_SOLID,   -- 0x08: solid block
-    TILE_COLOR_SPECIAL, -- 0x09: door block
+    TILE_COLOR_DOOR,    -- 0x09: door block
     TILE_COLOR_SPECIAL, -- 0x0A: spike block
     TILE_COLOR_SPECIAL, -- 0x0B: special block
     false,
