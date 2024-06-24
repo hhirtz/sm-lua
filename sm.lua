@@ -491,14 +491,18 @@ local function gameplay()
 end
 
 -- 0=air, 1=water, 2=lava/acid
-local function liquid_physics(bottom_y)
-    bottom_y = bottom_y or (SAMUS_Y >> 16) + SAMUS_RADIUS_Y
-    if ITEMS_EQUIPPED & ITEM_GRAVITY then
+local function liquid_physics(bottom_y, fx_position, lava_position)
+    if ITEMS_EQUIPPED & ITEM_GRAVITY ~= 0 then
         return 0
     end
-    if FX_POSITION >= 0 and bottom_y < (FX_POSITION >> 16) then
+
+    bottom_y = bottom_y and (bottom_y >> 16) or (SAMUS_Y >> 16) + SAMUS_RADIUS_Y
+    fx_position = fx_position or FX_POSITION
+    lava_position = lava_position or LAVA_POSITION
+
+    if fx_position >= 0 and bottom_y > (fx_position >> 16) then
         return 1
-    elseif LAVA_POSITION >= 0 and bottom_y < (LAVA_POSITION >> 16) then
+    elseif lava_position >= 0 and bottom_y > (lava_position >> 16) then
         return 2
     else
         return 0
@@ -880,14 +884,17 @@ local function draw_slopekiller_line()
         return
     end
 
-    -- TODO mixed air/water physics
+    -- TODO read unmorph_length from memory (for PAL, where unmorph is 5 frames)
     -- TODO pixel offset from level data
     -- TODO handle horizontal movement: 90:8EA9
 
     -- Up press lag: samus falls at full speed for one frame
     local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
 
-    local unmorph_length = 6 -- TODO don't hardcode it
+    -- crouching/unmorphing pose radius (ref: 91:B629)
+    y = y + 0x100000
+
+    local unmorph_length = 6
     local accel_y = SAMUS_Y_ACCEL_AIR
     if LIQUID_PHYSICS == 1 then
         unmorph_length = 12
@@ -896,6 +903,9 @@ local function draw_slopekiller_line()
         unmorph_length = 12
         accel_y = SAMUS_Y_ACCEL_LAVA
     end
+    local in_air = LIQUID_PHYSICS == 0
+    local fx_position = FX_POSITION
+    local lava_position = LAVA_POSITION
     local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or SAMUS_SPEED_Y
     while unmorph_length > 0 do
         -- TODO 90:A16C  94:86FE
@@ -904,8 +914,20 @@ local function draw_slopekiller_line()
             speed_y = speed_y + accel_y
         end
         unmorph_length = unmorph_length - 1
+        if in_air then
+            -- TODO update fx & lava position accross time
+            local lp = liquid_physics(y, fx_position, lava_position)
+            if lp == 1 then
+                in_air = false
+                unmorph_length = unmorph_length << 1
+                accel_y = SAMUS_Y_ACCEL_WATER
+            elseif lp == 2 then
+                in_air = false
+                unmorph_length = unmorph_length << 1
+                accel_y = SAMUS_Y_ACCEL_LAVA
+            end
+        end
     end
-    y = y + 0x100000 -- crouching pose radius (ref: 91:B629)
 
     local y_hi = (y >> 16)
 
