@@ -27,7 +27,7 @@ local PADDING_X = 0
 local PADDING_Y = 0
 
 -- whether to center on samus's hitbox instead of
--- aligning hotboxes on the game screen
+-- aligning hitboxes on the game screen
 local CENTER_SAMUS = false
 
 -- size of the font in pixels
