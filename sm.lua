@@ -1399,7 +1399,7 @@ local function draw_hud()
 
     local function draw_samus_pose(x, y)
         local pose_name = POSE_NAMES[SAMUS_POSE] or "???"
-        local text = string.format("Pose: $%02X \"%s\"", SAMUS_POSE, pose_name)
+        local text = string.format("Pose: %02Xh \"%s\"", SAMUS_POSE, pose_name)
         gui.text(x, y, text)
     end
 
