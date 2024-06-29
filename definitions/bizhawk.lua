@@ -44,6 +44,31 @@ function emu.setislagged(value) end
 ---@class (exact) event
 event = {}
 
+---@return string[]
+---@nodiscard
+function event.availableScopes() end
+
+---@param f fun(address: integer, value: integer, flags: integer)
+---@param address? integer
+---@param name? string
+---@param scope? string
+---@return string
+function event.on_bus_exec(f, address, name, scope) end
+
+---@param f fun(address: integer, value: integer, flags: integer)
+---@param address? integer
+---@param name? string
+---@param scope? string
+---@return string
+function event.on_bus_read(f, address, name, scope) end
+
+---@param f fun(address: integer, value: integer, flags: integer)
+---@param address? integer
+---@param name? string
+---@param scope? string
+---@return string
+function event.on_bus_write(f, address, name, scope) end
+
 ---@param f fun()
 ---@param name? string
 ---@return string
@@ -254,6 +279,33 @@ function memory.write_u16_le(address, value, domain) end
 ---@param value integer
 ---@param domain? string
 function memory.write_s16_le(address, value, domain) end
+
+---@class (exact) snes
+snes = {}
+
+---@param enabled boolean
+function snes.setlayer_bg_1(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_bg_2(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_bg_3(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_bg_4(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_obj_1(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_obj_2(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_obj_3(enabled) end
+
+---@param enabled boolean
+function snes.setlayer_obj_4(enabled) end
 
 ---@class (exact) tastudio
 tastudio = {}
