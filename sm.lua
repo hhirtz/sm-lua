@@ -285,11 +285,11 @@ local BUTTON_SELECT = 1 << 13
 local BUTTON_Y = 1 << 14
 local BUTTON_B = 1 << 15
 
-local ITEM_VARIA = 1 << 1
-local ITEM_SPRING = 1 << 2
-local ITEM_MORPH = 1 << 3
-local ITEM_SCREW = 1 << 4
-local ITEM_GRAVITY = 1 << 6
+local ITEM_VARIA = 1 << 0
+local ITEM_SPRING = 1 << 1
+local ITEM_MORPH = 1 << 2
+local ITEM_SCREW = 1 << 3
+local ITEM_GRAVITY = 1 << 5
 local ITEM_HIJUMP = 1 << 8
 local ITEM_SPACE = 1 << 9
 local ITEM_BOMBS = 1 << 12
