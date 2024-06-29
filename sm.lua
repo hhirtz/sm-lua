@@ -934,7 +934,7 @@ local function draw_enemy_projectile_hitboxes()
                 local timer = ENEMY_PROJECTILE_TIMERS[i]
                 local cooldown, rng_calls = run_instruction_list(instruction, timer)
                 if cooldown and rng_calls then
-                    -- death animation that didn't became a pickup
+                    -- death animation that didn't become a pickup
                     cooldown = cooldown + ENEMY_PROJECTILE_INSTR_TIMERS[i]
 
                     -- TODO take into account other RNG interference
