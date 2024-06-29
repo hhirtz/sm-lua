@@ -317,6 +317,7 @@ local ITEMS_EQUIPPED = 0
 local KNOCKBACK = 0
 local LAVA_POSITION = 0
 local LIQUID_PHYSICS = 0
+local MUSIC_TIMER = 0
 local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
@@ -481,6 +482,7 @@ local function read_new_memory()
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
     LAVA_POSITION = mainmemory.read_s32_le(0x1962)
     LIQUID_PHYSICS = mainmemory.read_u16_le(0x0AD2)
+    MUSIC_TIMER = mainmemory.read_u16_le(0x063F)
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
@@ -1469,6 +1471,24 @@ local function draw_hud()
         gui.text(x, y, text, color)
     end
 
+    local function draw_fanfare_timer(x, y)
+        local fanfare_timer = 0
+        if SAMUS_POSE == 0x00 or SAMUS_POSE == 0x9B then
+            fanfare_timer = MUSIC_TIMER
+        end
+        local text = string.format("Fanfare:%7d", fanfare_timer)
+        local color
+        if fanfare_timer == 0 then
+            color = HUD_COLOR_LO
+        end
+        gui.text(x, y, text, color)
+    end
+
+    local function draw_game_state(x, y)
+        local text = string.format("Game state: %02Xh", GAME_STATE)
+        gui.text(x, y, text)
+    end
+
     draw_samus_dx(HUD_COLUMN_0, HUD_ROW_0)
     draw_samus_dy(HUD_COLUMN_0, HUD_ROW_1)
     draw_samus_x(HUD_COLUMN_0, HUD_ROW_2)
@@ -1483,8 +1503,10 @@ local function draw_hud()
     draw_knockback_iframes(HUD_COLUMN_1, HUD_ROW_3)
     draw_speed_level(HUD_COLUMN_1, HUD_ROW_4)
     draw_spark_timer(HUD_COLUMN_1, HUD_ROW_5)
+    draw_game_state(HUD_COLUMN_1, HUD_ROW_6)
 
     draw_jump_speed(HUD_COLUMN_2, HUD_ROW_1)
+    draw_fanfare_timer(HUD_COLUMN_2, HUD_ROW_2)
 end
 
 event.onframestart(read_old_memory)
