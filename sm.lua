@@ -584,6 +584,12 @@ local function predict_jump_speed()
     return (speed << 16) | subspeed
 end
 
+local function draw_background()
+    if CENTER_SAMUS then
+        gui.drawRectangle(PADDING_X, PADDING_Y, 256, 224, 0xA0000000, 0xA0000000)
+    end
+end
+
 local function draw_samus_hitbox()
     -- hitbox around samus
     local x = (SAMUS_X >> 16) - OFFSET_X
@@ -1355,6 +1361,7 @@ while true do
     end
 
     if gameplay() then
+        draw_background()
         draw_blocks()
         draw_samus_hitbox()
         draw_speed_percent()
