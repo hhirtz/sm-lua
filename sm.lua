@@ -1142,8 +1142,8 @@ local function draw_blocks()
     local type = type
 
     local line_length = 17 + (PADDING_X >> 3)
-    local block_x_offset = OFFSET_X & 0x0F
-    local block_y_offset = OFFSET_Y & 0x0F
+    local block_x_offset = OFFSET_X % 16
+    local block_y_offset = OFFSET_Y % 16
     local screen_offset = (OFFSET_Y // 16) * ROOM_WIDTH + (OFFSET_X // 16)
     for y = 0, 14 + (PADDING_Y >> 3) do
         local block_y = (y << 4) - block_y_offset
