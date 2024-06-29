@@ -681,7 +681,7 @@ local function draw_grapple_throw_speed()
         local a_hi = a & 0xFF00
         local y_lo = y & 0x00FF
         local y_hi = y & 0xFF00
-        return ((a_lo * y_lo + a_hi * y_lo + a_lo * y_hi) & 0xFFFFFF) + a_hi * y_hi
+        return ((a_lo * y + a_hi * y_lo) & 0xFFFFFF) + a_hi * y_hi
     end
 
     -- ref: 9B:CA65
