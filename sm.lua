@@ -304,7 +304,6 @@ local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
 local ENEMY_DROP_CHANCES = nil
-local ENEMY_HEADERS = nil
 local FX_POSITION = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
@@ -366,10 +365,14 @@ local BOMB_TIMERS = {}
 
 local ENEMY_COUNT = 0
 local ENEMY_DATA = {}
+local ENEMY_PROJECTILE_ENEMIES = {}
 local ENEMY_PROJECTILE_IDS = {}
+local ENEMY_PROJECTILE_INSTRS = {}
+local ENEMY_PROJECTILE_INSTR_TIMERS = {}
 local ENEMY_PROJECTILE_XS = {}
 local ENEMY_PROJECTILE_YS = {}
 local ENEMY_PROJECTILE_RADIUSES = {}
+local ENEMY_PROJECTILE_TIMERS = {}
 
 
 -----------------------------
@@ -415,18 +418,21 @@ local function table_u16_le(t, i)
     return (t[i]) | (t[i + 1] << 8)
 end
 
-local function read_enemy_headers()
-    local bytes = memory.read_bytes_as_array(0xA0CEBF, 8832)
-    local res = {}
-    for i = 1, 138 do
-        local offset = (i - 1) * 0x40 + 1
-        local drop_chances = table_u16_le(bytes, offset + 0x3A)
-        res[i] = {
-            max_health = table_u16_le(bytes, offset + 0x04),
+local _ENEMY_HEADERS = {}
+local function get_enemy_header(enemy_id)
+    local header = _ENEMY_HEADERS[enemy_id]
+
+    if not header then
+        local bytes = memory.read_bytes_as_array(0xA00000 | enemy_id, 0x40)
+        local drop_chances = table_u16_le(bytes, 0x3B)
+        header = {
+            max_health = table_u16_le(bytes, 0x05),
             drop_chances = drop_chances ~= 0 and (drop_chances - 0xF1F3) or nil,
         }
+        _ENEMY_HEADERS[enemy_id] = header
     end
-    return res
+
+    return header
 end
 
 local function read_enemy_data(res)
@@ -461,7 +467,6 @@ local function read_new_memory()
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
-    ENEMY_HEADERS = ENEMY_HEADERS or read_enemy_headers()
     FX_POSITION = mainmemory.read_s32_le(0x195C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
@@ -515,10 +520,14 @@ local function read_new_memory()
     ENEMY_COUNT = mainmemory.read_u8(0x0E4E)
     read_enemy_data(ENEMY_DATA)
 
+    read_u16_le_array(ENEMY_PROJECTILE_ENEMIES, 0x7EF3C8, 18)
     read_u16_le_array(ENEMY_PROJECTILE_IDS, 0x7E1997, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_INSTRS, 0x7E1B47, 18)
+    read_u16_le_array(ENEMY_PROJECTILE_INSTR_TIMERS, 0x7E1B8F, 18)
     read_u16_le_array(ENEMY_PROJECTILE_XS, 0x7E1A4B, 18)
     read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
+    read_u16_le_array(ENEMY_PROJECTILE_TIMERS, 0x7E19DF, 18)
 
     if CENTER_SAMUS then
         OFFSET_X = (SAMUS_X >> 16) - 128 - PADDING_X
@@ -710,17 +719,15 @@ local function draw_grapple_throw_speed()
 end
 
 local DROP_NAMES = {
-    "sl energy",
-    "bg energy",
+    "sl nrgy",
+    "bg nrgy",
     "missile",
     "nothing",
     "super",
-    "powerbomb",
+    "powrbmb",
 }
-local function predict_enemy_drop(drop_chances_idx)
+local function predict_enemy_drop(drop_chances_idx, random)
     -- ref: 86:F106
-
-    -- TODO see 86:EEAF and 86:EF29
 
     local small_energy = ENEMY_DROP_CHANCES[drop_chances_idx]
     local big_energy = ENEMY_DROP_CHANCES[drop_chances_idx + 1]
@@ -729,10 +736,10 @@ local function predict_enemy_drop(drop_chances_idx)
     local super = ENEMY_DROP_CHANCES[drop_chances_idx + 4]
     local powerbomb = ENEMY_DROP_CHANCES[drop_chances_idx + 5]
 
-    local random
+    random = random or RANDOM
     repeat
-        random = next_random(RANDOM)
-    until random ~= 0
+        random = next_random(random)
+    until random & 0xFF ~= 0
     random = random & 0xFF
 
     local health_bomb = (SAMUS_HEALTH + SAMUS_HEALTH_RESERVE < 30) or
@@ -740,7 +747,7 @@ local function predict_enemy_drop(drop_chances_idx)
 
     local enabled_drops = 0
     local pooled_minors_chance = 0
-    local pooled_majors_chance = 0xFF
+    local pooled_majors_complement = 0xFF
     if health_bomb then
         enabled_drops = 0x03
         pooled_minors_chance = small_energy + big_energy
@@ -757,23 +764,21 @@ local function predict_enemy_drop(drop_chances_idx)
         end
         if SAMUS_SUPERS ~= SAMUS_SUPERS_MAX then
             enabled_drops = enabled_drops | 0x10
-            pooled_majors_chance = pooled_majors_chance - super
+            pooled_majors_complement = pooled_majors_complement - super
         end
         if SAMUS_POWERBOMBS ~= SAMUS_POWERBOMBS_MAX then
             enabled_drops = enabled_drops | 0x20
-            pooled_majors_chance = pooled_majors_chance - powerbomb
+            pooled_majors_complement = pooled_majors_complement - powerbomb
         end
     end
 
     local drop_chance_acc = 0
-    if pooled_minors_chance ~= 0 then
-        for i = 0, 3 do
-            if enabled_drops & (1 << i) ~= 0 then
-                drop_chance_acc = drop_chance_acc +
-                    ((ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_chance) & 0xFF) // pooled_minors_chance
-                if drop_chance_acc >= random then
-                    return i
-                end
+    for i = 0, 3 do
+        if enabled_drops & (1 << i) ~= 0 then
+            drop_chance_acc = drop_chance_acc +
+                (ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_complement) // pooled_minors_chance
+            if drop_chance_acc >= random then
+                return i
             end
         end
     end
@@ -798,39 +803,176 @@ local function draw_enemy_hitboxes()
             -- TODO extended sprite map
             gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
 
-            -- TODO make it work with bosses
-            local enemy_header = ENEMY_HEADERS[((enemy.id - 0xCEBF) >> 6) + 1]
-            local drop = "nothing"
-            if enemy_header and enemy_header.drop_chances then
-                -- TODO show timer until drop appears
-                drop = DROP_NAMES[predict_enemy_drop(enemy_header.drop_chances) + 1]
-            end
-
-            local max_health = enemy_header and enemy_header.max_health or 0
+            local enemy_header = get_enemy_header(enemy.id)
+            local max_health = enemy_header.max_health
 
             local textpos = client_transformPoint(x + 1, y + 1)
             local text
             if enemy.iframes ~= 0 then
-                text = string.format("hp: %d/%d\ndrop: %s\ninv: %d",
-                    enemy.health, max_health, drop, enemy.iframes)
+                text = string.format("hp: %d/%d\ninv: %d",
+                    enemy.health, max_health, enemy.iframes)
             else
-                text = string.format("hp: %d/%d\ndrop: %s",
-                    enemy.health, max_health, drop)
+                text = string.format("hp: %d/%d", enemy.health, max_health)
             end
             gui.text(textpos.x, textpos.y, text)
         end
     end
 end
 
+local _ILIST_STARTS = {
+    -- addresses where instruction lists start. must be sorted
+    0xECAB,
+    0xECC5,
+    0xED4B,
+    0xED69,
+    0xED8D,
+    0xEDA3,
+    0xEDB9,
+    0xEDDD,
+    0xEDEB,
+    0xEDFF,
+}
+local _ILIST_NOK_STARTS = {
+    -- instruction lists between _ILIST_STARTS[1] and
+    -- _ILIST_STARTS[#_ILIST_STARTS] that aren't ok to
+    -- run because they would loop infinitely
+    [0xED8D] = true,
+    [0xEDA3] = true,
+    [0xEDB9] = true,
+    [0xEDDD] = true,
+    [0xEDEB] = true,
+}
+local _INSTRUCTION_ARG_COUNTS = {
+    -- number of arguments eaten by instructions
+    [0x81C6] = 1,
+    [0x81D5] = 1,
+    [0xECE3] = 1,
+    [0xED17] = 1,
+}
+local _INSTRUCTION_RNG_CALLS = {
+    -- number of RNG calls instructions do
+    [0xECE3] = 1,
+    [0xED17] = 1,
+}
+local _ILISTS = {}
+local _ILIST_MAX_LENGTH = 76 -- in bytes
+-- run an instruction list until the "delete" (0x8154) instruction is reached
+-- ptr = projectile instruction pointer
+-- projectile_timer = projectile timer (not the instruction timer)
+-- returns X,Y
+-- X = number of frames until instruction list ends (minus current instruction timer value)
+-- Y = number of RNG calls triggered in the process
+local function run_instruction_list(ptr, projectile_timer)
+    -- ref: 86:8125
+
+    local function get_instr_list_begin_ptr(current_ptr)
+        for i = #_ILIST_STARTS, 1, -1 do
+            local begin_ptr = _ILIST_STARTS[i]
+            if begin_ptr <= current_ptr then
+                return begin_ptr
+            end
+        end
+        return nil
+    end
+
+    local function get_instr_list(begin_ptr)
+        local ilist = _ILISTS[begin_ptr]
+        if not ilist then
+            ilist = {}
+
+            -- all instruction lists span fewer than 76 bytes
+            read_u16_le_array(ilist, 0x860000 | begin_ptr, _ILIST_MAX_LENGTH >> 1)
+
+            _ILISTS[begin_ptr] = ilist
+        end
+        return ilist
+    end
+
+    local begin_ptr = get_instr_list_begin_ptr(ptr)
+    if not begin_ptr or ptr - begin_ptr >= _ILIST_MAX_LENGTH or _ILIST_NOK_STARTS[begin_ptr] then
+        -- unknown instruction list, or it's infinite
+        return nil, nil
+    end
+
+    local ilist = get_instr_list(begin_ptr)
+    local local_ptr = ((ptr - begin_ptr) >> 1) + 1
+    local frames = 0
+    local rng_calls = 0
+    local exe_counter = 0
+    repeat
+        exe_counter = exe_counter + 1
+        if exe_counter >= 100 then
+            print(string.format("Instuction %04X started at %04X is looping infinitely.", begin_ptr, ptr))
+            return nil, nil
+        end
+
+        local instruction = ilist[local_ptr]
+
+        if instruction & 0x8000 == 0 then
+            -- spritemap timer & pointer
+            frames = frames + instruction
+            local_ptr = local_ptr + 2
+        elseif instruction == 0x81D5 then
+            -- projectile timer init
+            projectile_timer = ilist[local_ptr + 1]
+            local_ptr = local_ptr + 2
+        elseif instruction == 0x81C6 then
+            -- projectile timer nil test
+            projectile_timer = projectile_timer - 1
+            if projectile_timer == 0 then
+                local_ptr = local_ptr + 2
+            else
+                local jump_ptr = ilist[local_ptr + 1]
+                local_ptr = ((jump_ptr - begin_ptr) >> 1) + 1
+            end
+        else
+            -- pointer to code
+            local_ptr = local_ptr + (_INSTRUCTION_ARG_COUNTS[instruction] or 0) + 1
+            rng_calls = rng_calls + (_INSTRUCTION_RNG_CALLS[instruction] or 0)
+        end
+    until instruction == 0x8154
+
+    return frames, rng_calls
+end
+
 local function draw_enemy_projectile_hitboxes()
     for i = 18, 1, -1 do
-        if ENEMY_PROJECTILE_IDS[i] ~= 0 then
+        local id = ENEMY_PROJECTILE_IDS[i]
+        if id ~= 0 then
             local radius_i = i << 1
             local radius_x = ENEMY_PROJECTILE_RADIUSES[radius_i - 1]
             local radius_y = ENEMY_PROJECTILE_RADIUSES[radius_i]
             local x1 = ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
             local y1 = ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
             gui.drawRectangle(x1, y1, radius_x << 1, radius_y << 1, 0xFFFF8000, 0x35FF8000)
+
+            if id == 0xF345 then
+                -- death animation
+                local instruction = ENEMY_PROJECTILE_INSTRS[i]
+                local timer = ENEMY_PROJECTILE_TIMERS[i]
+                local cooldown, rng_calls = run_instruction_list(instruction, timer)
+                if cooldown and rng_calls then
+                    -- death animation that didn't became a pickup
+                    cooldown = cooldown + ENEMY_PROJECTILE_INSTR_TIMERS[i]
+
+                    -- TODO take into account other RNG interference
+
+                    local enemy_id = ENEMY_PROJECTILE_ENEMIES[i]
+                    local enemy_header = get_enemy_header(enemy_id)
+                    local drop_chances = enemy_header.drop_chances
+                    if drop_chances then
+                        local random = RANDOM
+                        for _ = 1, cooldown + rng_calls do
+                            random = next_random(random)
+                        end
+                        local drop = DROP_NAMES[predict_enemy_drop(drop_chances, random) + 1]
+
+                        local textpos = client_transformPoint(x1 + 1, y1 + 1)
+                        gui.text(textpos.x, textpos.y,
+                            string.format("%s in %df\nrng: %04X", drop, cooldown, random))
+                    end
+                end
+            end
         end
     end
 end
