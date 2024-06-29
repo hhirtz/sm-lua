@@ -1080,13 +1080,13 @@ COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = (line_bts and line_bts[line_index]) or
-            memory.read_u8(0x7F6402 + global_index)
+        local bts = (line_bts and u8_to_s8(line_bts[line_index])) or
+            memory.read_s8(0x7F6402 + global_index)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = global_index + u8_to_s8(bts)
+        local extension_index = global_index + bts
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return SIMPLE_OUTLINES[block_type + 1] or
             COMPLEX_OUTLINES[block_type](extension_index, 0, nil, stack_limit - 1)
@@ -1108,13 +1108,13 @@ COMPLEX_OUTLINES = {
         if stack_limit == 0 then
             return TILE_COLOR_ERROR
         end
-        local bts = (line_bts and line_bts[line_index]) or
-            memory.read_u8(0x7F6402 + global_index)
+        local bts = (line_bts and u8_to_s8(line_bts[line_index])) or
+            memory.read_s8(0x7F6402 + global_index)
         if bts == 0 then
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = global_index + u8_to_s8(bts) * ROOM_WIDTH
+        local extension_index = global_index + bts * ROOM_WIDTH
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return SIMPLE_OUTLINES[block_type + 1] or
             COMPLEX_OUTLINES[block_type](extension_index, 0, nil, stack_limit - 1)
