@@ -533,7 +533,7 @@ end
 
 local function gameplay()
     -- TODO return false during pause
-    return (0x08 <= GAME_STATE and GAME_STATE <= 0x12) or
+    return (0x08 <= GAME_STATE and GAME_STATE <= 0x14) or
         GAME_STATE == 0x2A
 end
 
@@ -979,7 +979,7 @@ local function draw_blocks()
         (GAME_STATE == 0x0B and (DOOR_TRANSITION_FUNC < 0xE2F7 or 0xE36E < DOOR_TRANSITION_FUNC)) or
         (GAME_STATE == 0x0C) or
         (GAME_STATE == 0x11) or
-        (GAME_STATE == 0x12)
+        (0x12 <= GAME_STATE and GAME_STATE <= 0x14)
     if not valid_level_data then
         return
     end
