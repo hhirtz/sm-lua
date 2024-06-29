@@ -755,12 +755,14 @@ local function predict_enemy_drop(drop_chances_idx, random)
     end
 
     local drop_chance_acc = 0
-    for i = 0, 3 do
-        if enabled_drops & (1 << i) ~= 0 then
-            drop_chance_acc = drop_chance_acc +
-                (ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_complement) // pooled_minors_chance
-            if drop_chance_acc >= random then
-                return i
+    if pooled_minors_chance ~= 0 then
+        for i = 0, 3 do
+            if enabled_drops & (1 << i) ~= 0 then
+                drop_chance_acc = drop_chance_acc +
+                    (ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_complement) // pooled_minors_chance
+                if drop_chance_acc >= random then
+                    return i
+                end
             end
         end
     end
@@ -934,7 +936,7 @@ local function draw_enemy_projectile_hitboxes()
                 local timer = ENEMY_PROJECTILE_TIMERS[i]
                 local cooldown, rng_calls = run_instruction_list(instruction, timer)
                 if cooldown and rng_calls then
-                    -- death animation that didn't become a pickup
+                    -- death animation that hasn't become a pickup yet
                     cooldown = cooldown + ENEMY_PROJECTILE_INSTR_TIMERS[i]
 
                     -- TODO take into account other RNG interference
