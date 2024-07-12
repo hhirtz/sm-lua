@@ -13,7 +13,7 @@ local PADDING_Y = 0
 -- aligning hitboxes on the game screen
 local CENTER_SAMUS = false
 
--- size of the font in pixels
+-- expected size of the font in pixels
 local GUI_FONT_SIZE = 16
 
 -- hud settings
