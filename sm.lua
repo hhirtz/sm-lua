@@ -284,6 +284,7 @@ local ITEM_XRAY = 1 << 15
 
 -----------------------------
 -- memory values
+local CERES_STEAM_PTRS = {}
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
@@ -435,7 +436,10 @@ local function read_enemy_data(res)
             radius_x = table_u16_le(bytes, offset + 10),
             radius_y = table_u16_le(bytes, offset + 12),
             health = table_u16_le(bytes, offset + 20),
+            ilist_ptr = table_u16_le(bytes, offset + 26),
+            ilist_timer = table_u16_le(bytes, offset + 28),
             iframes = table_u16_le(bytes, offset + 40),
+            ai4 = table_u16_le(bytes, offset + 54),
         }
     end
 end
@@ -449,6 +453,9 @@ local function read_old_memory()
 end
 
 local function read_new_memory()
+    if #CERES_STEAM_PTRS == 0 then
+        read_u16_le_array(CERES_STEAM_PTRS, 0xA6EFF5, 6)
+    end
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
@@ -783,6 +790,19 @@ local function predict_enemy_drop(drop_chances_idx, random)
     return 3
 end
 
+local function time_until_steam_hits(enemy)
+    local instr = memory.read_u16_le(0xA60000 | enemy.ilist_ptr)
+    if instr == 0xF11D then
+        return enemy.ai4
+    elseif instr == 0xF127 then
+        return enemy.ai4
+    elseif instr == 0xF135 then
+        return enemy.ilist_timer
+    else
+        return 0
+    end
+end
+
 local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
         local enemy = ENEMY_DATA[i]
@@ -804,6 +824,12 @@ local function draw_enemy_hitboxes()
             else
                 text = string.format("hp: %d/%d", enemy.health, max_health)
             end
+
+            if enemy.id == 0xE1FF then
+                local n = time_until_steam_hits(enemy)
+                text = string.format("%s\nhitting in %df", text, n)
+            end
+
             gui.text(textpos.x, textpos.y, text)
         end
     end
