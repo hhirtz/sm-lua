@@ -1,3 +1,6 @@
+-- Super Metroid TAS script
+-- for bizhawk 2.9
+
 -----------------------------
 -- script settings
 
