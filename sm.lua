@@ -1310,6 +1310,16 @@ local function draw_hud()
         gui.text(x, y, text)
     end
 
+    local function draw_screen_x(x, y)
+        local text = string.format("sx:%12d", SCREEN_X)
+        gui.text(x, y, text)
+    end
+
+    local function draw_screen_y(x, y)
+        local text = string.format("sy:%12d", SCREEN_Y)
+        gui.text(x, y, text)
+    end
+
     local function draw_samus_speed_x(x, y)
         local format
         if SAMUS_DIRECTION_X == 0 then
@@ -1493,6 +1503,8 @@ local function draw_hud()
 
     draw_jump_speed(HUD_COLUMN_2, HUD_ROW_1)
     draw_fanfare_timer(HUD_COLUMN_2, HUD_ROW_2)
+    draw_screen_x(HUD_COLUMN_2, HUD_ROW_3)
+    draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
 end
 
 event.onframestart(read_old_memory)
