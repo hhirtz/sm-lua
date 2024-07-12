@@ -1203,15 +1203,16 @@ local function draw_slopekiller_line()
     y = y + 0x100000
 
     local unmorph_length = 6
+    local lp = liquid_physics()
     local accel_y = SAMUS_Y_ACCEL_AIR
-    if LIQUID_PHYSICS == 1 then
+    if lp == 1 then
         unmorph_length = 12
         accel_y = SAMUS_Y_ACCEL_WATER
-    elseif LIQUID_PHYSICS == 2 then
+    elseif lp == 2 then
         unmorph_length = 12
         accel_y = SAMUS_Y_ACCEL_LAVA
     end
-    local in_air = LIQUID_PHYSICS == 0
+    local in_air = lp == 0
     local fx_position = FX_POSITION
     local lava_position = LAVA_POSITION
     local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or SAMUS_SPEED_Y
@@ -1224,7 +1225,7 @@ local function draw_slopekiller_line()
         unmorph_length = unmorph_length - 1
         if in_air then
             -- TODO update fx & lava position accross time
-            local lp = liquid_physics(y, fx_position, lava_position)
+            lp = liquid_physics(y, fx_position, lava_position)
             if lp == 1 then
                 in_air = false
                 unmorph_length = unmorph_length << 1
@@ -1242,7 +1243,7 @@ local function draw_slopekiller_line()
     local y_line = y_hi - OFFSET_Y
     gui.drawLine(0, y_line, 256 + 2 * PADDING_X, y_line, 0xFFFFFFFF)
     local textpos = client_transformPoint(0, y_line - 1)
-    gui.text(0, textpos.y - GUI_FONT_SIZE, string.format("%d", y_hi))
+    gui.text(0, textpos.y - GUI_FONT_SIZE, string.format("unmorph at: %d", y_hi))
 end
 
 local _dlag_seen_transition_start = false
