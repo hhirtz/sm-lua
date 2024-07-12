@@ -1322,7 +1322,6 @@ local function draw_door_lag()
 end
 
 local function mark_door_transitions_as_lag()
-    -- TODO this is called before GAME_STATE is initialized
     if OLD_GAME_STATE == 0x0B or GAME_STATE == 0x0B then
         tastudio.setlag(FRAME_NO, true)
     end
