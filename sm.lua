@@ -619,17 +619,19 @@ local function draw_speed_percent()
     local textpos = client_transformPoint(x, y)
     local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *$0B4A and *$0A6C
     local dx_ratio = SAMUS_DX / expected_dx * 100
-    if dx_ratio == dx_ratio then
+    if dx_ratio == dx_ratio and dx_ratio ~= 100.0 then
         -- dx_ratio is not NaN
         local expected_dx_msg = string.format("dx:%3.0f%%", SAMUS_DX / expected_dx * 100)
-        gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg)
+        local color = SAMUS_DX < expected_dx and HUD_COLOR_HI or HUD_COLOR_LO
+        gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg, color)
     end
     local expected_dy = math.abs(OLD_SAMUS_SPEED_Y)
     local dy_ratio = SAMUS_DY / expected_dy * 100
-    if dy_ratio == dy_ratio then
+    if dy_ratio == dy_ratio and dy_ratio ~= 100.0 then
         -- dy_ratio is not NaN
         local expected_dy_msg = string.format("dy:%3.0f%%", SAMUS_DY / expected_dy * 100)
-        gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg)
+        local color = SAMUS_DY < expected_dy and HUD_COLOR_HI or HUD_COLOR_LO
+        gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, expected_dy_msg, color)
     end
 end
 
