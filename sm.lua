@@ -41,6 +41,7 @@ local TILE_COLOR_ERROR = 0xFFFF0000
 local TILE_COLOR_SLOPE = 0xA0FFFFFF
 local TILE_COLOR_SOLID = 0xA0FFFFFF
 local TILE_COLOR_SPECIAL = 0xFF0000FF
+local TILE_COLOR_SPIKE_AIR = 0xC08080FF
 
 
 -----------------------------
@@ -1035,18 +1036,18 @@ local function build_slopes()
 end
 
 local SIMPLE_OUTLINES = {
-    TILE_COLOR_AIR,     -- 0x00: air
+    TILE_COLOR_AIR,       -- 0x00: air
     false,
-    TILE_COLOR_AIR,     -- 0x02: spike air
-    TILE_COLOR_SPECIAL, -- 0x03: special air
-    TILE_COLOR_AIR,     -- 0x04: shootable air
+    TILE_COLOR_SPIKE_AIR, -- 0x02: spike air
+    TILE_COLOR_SPECIAL,   -- 0x03: special air
+    TILE_COLOR_AIR,       -- 0x04: shootable air
     false,
-    TILE_COLOR_AIR,     -- 0x06: unused air
-    TILE_COLOR_AIR,     -- 0x07: bombable air
-    TILE_COLOR_SOLID,   -- 0x08: solid block
-    TILE_COLOR_DOOR,    -- 0x09: door block
-    TILE_COLOR_SPECIAL, -- 0x0A: spike block
-    TILE_COLOR_SPECIAL, -- 0x0B: special block
+    TILE_COLOR_AIR,       -- 0x06: unused air
+    TILE_COLOR_AIR,       -- 0x07: bombable air
+    TILE_COLOR_SOLID,     -- 0x08: solid block
+    TILE_COLOR_DOOR,      -- 0x09: door block
+    TILE_COLOR_SPECIAL,   -- 0x0A: spike block
+    TILE_COLOR_SPECIAL,   -- 0x0B: special block
     false,
     false,
     TILE_COLOR_SPECIAL, -- 0x0E: grapple block
