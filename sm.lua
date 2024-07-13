@@ -1248,18 +1248,16 @@ end
 
 local _dlag_seen_transition_start = false
 local _dlag_seen_transition_end = false
-local _dlag_elevator = 0
 local _dlag_sound = 0
+local _dlag_fade_out = -39 -- fade out should last 40 frames
 local _dlag_scroll = 0
-local _dlag_moving_up = 0
 local function draw_door_lag()
     if SEEKED then
         _dlag_seen_transition_start = false
         _dlag_seen_transition_end = false
-        _dlag_elevator = 0
         _dlag_sound = 0
+        _dlag_fade_out = -39
         _dlag_scroll = 0
-        _dlag_moving_up = 0
     end
 
     if not (0x09 <= GAME_STATE and GAME_STATE <= 0x0B) then
@@ -1270,54 +1268,53 @@ local function draw_door_lag()
     if not SEEKED and OLD_GAME_STATE == 0x08 then
         _dlag_seen_transition_start = true
         _dlag_seen_transition_end = false
-        _dlag_elevator = 0
         _dlag_sound = 0
+        _dlag_fade_out = -39
         _dlag_scroll = 0
-        _dlag_moving_up = 0
     end
 
-    if GAME_STATE == 0x0B then
-        if DOOR_TRANSITION_FUNC == 0xE17D and OLD_DOOR_TRANSITION_FUNC == 0xE17D then
-            _dlag_elevator = _dlag_elevator + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE29E and OLD_DOOR_TRANSITION_FUNC == 0xE29E then
+    if DOOR_TRANSITION_FUNC == OLD_DOOR_TRANSITION_FUNC then
+        if DOOR_TRANSITION_FUNC == 0xE29E then
             _dlag_sound = _dlag_sound + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE310 and OLD_DOOR_TRANSITION_FUNC == 0xE310 then
+        elseif DOOR_TRANSITION_FUNC == 0xE2DB then
+            _dlag_fade_out = _dlag_fade_out + 1
+        elseif DOOR_TRANSITION_FUNC == 0xE310 or DOOR_TRANSITION_FUNC == 0xE353 then
             _dlag_scroll = _dlag_scroll + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE353 and OLD_DOOR_TRANSITION_FUNC == 0xE353 then
-            _dlag_moving_up = _dlag_moving_up + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE36E then
-            _dlag_seen_transition_end = true
         end
     end
+    if DOOR_TRANSITION_FUNC == 0xE36E then
+        _dlag_seen_transition_end = true
+    end
 
-    local sum = _dlag_scroll + _dlag_sound + _dlag_elevator + _dlag_moving_up
-    local lag_msg
-    if _dlag_seen_transition_start then
-        lag_msg = string.format("Door lag=%2d", sum)
-    else
-        lag_msg = string.format("Door lag>%2d", sum)
-    end
+    local op = _dlag_seen_transition_start and "=" or ">"
+    local done = _dlag_seen_transition_end and "(done)" or "(in progress)"
+
     local breakdown = {}
-    if _dlag_elevator ~= 0 then
-        breakdown[#breakdown + 1] = string.format("elevator=%d", _dlag_elevator)
-    end
     if _dlag_sound ~= 0 then
-        breakdown[#breakdown + 1] = string.format("sound=%d", _dlag_sound)
+        breakdown[#breakdown + 1] = string.format("sound%s%d", op, _dlag_sound)
+    end
+    if _dlag_fade_out > 0 then
+        breakdown[#breakdown + 1] = string.format("process%s%d", op, _dlag_fade_out)
     end
     if _dlag_scroll ~= 0 then
-        breakdown[#breakdown + 1] = string.format("scroll=%d", _dlag_scroll)
+        breakdown[#breakdown + 1] = string.format("scroll%s%d", op, _dlag_scroll)
     end
-    if _dlag_moving_up ~= 0 then
-        breakdown[#breakdown + 1] = string.format("moving_up=%d", _dlag_moving_up)
+    if _dlag_seen_transition_end and _dlag_fade_out < 0 then
+        breakdown[#breakdown + 1] = string.format("fade out%s%d", op, _dlag_fade_out)
     end
-    if #breakdown ~= 0 then
-        lag_msg = lag_msg .. " (" .. table.concat(breakdown, ", ") .. ")"
-    end
-    if _dlag_seen_transition_end then
-        lag_msg = lag_msg .. " (done)"
+
+    local lag_msg
+    if #breakdown == 0 then
+        lag_msg = string.format("Door lag %s 0 %s", op, done)
     else
-        lag_msg = lag_msg .. " (in progress)"
+        local sum = _dlag_scroll + _dlag_sound
+        if _dlag_fade_out > 0 or _dlag_seen_transition_end then
+            sum = sum + _dlag_fade_out
+        end
+        local brkdwn = table.concat(breakdown, ", ")
+        lag_msg = string.format("Door lag %s%2d (%s) %s", op, sum, brkdwn, done)
     end
+
     gui.text(0, 0, lag_msg, HUD_COLOR_HI, "bottomleft")
 end
 
