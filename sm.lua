@@ -301,7 +301,6 @@ local INPUT = 0
 local ITEMS_EQUIPPED = 0
 local KNOCKBACK = 0
 local LAVA_POSITION = 0
-local LIQUID_PHYSICS = 0
 local MUSIC_TIMER = 0
 local POWERBOMB_RADIUS = 0
 local POWERBOMB_TIMER = 0
@@ -472,7 +471,6 @@ local function read_new_memory()
     ITEMS_EQUIPPED = mainmemory.read_u16_le(0x09A2)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
     LAVA_POSITION = mainmemory.read_s32_le(0x1960)
-    LIQUID_PHYSICS = mainmemory.read_u16_le(0x0AD2)
     MUSIC_TIMER = mainmemory.read_u16_le(0x063F)
     POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
