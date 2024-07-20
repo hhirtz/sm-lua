@@ -382,8 +382,30 @@ local function u8_to_s8(n)
     return (n & 0x7F) - (n & 0x80)
 end
 
+-- fixes memory.read_bytes_as_array to make it read the correct data when
+-- address+length overflows the bank.
+local _rbaa = memory.read_bytes_as_array
+local function read_bytes_as_array(address, length)
+    local bank_local = address & 0xFFFF
+    if bank_local + length <= 0xFFFF then
+        return _rbaa(address, length)
+    end
+
+    local a1_length = 0x10000 - bank_local
+    local a1 = _rbaa(address, a1_length)
+
+    local a2_length = length - a1_length
+    local a2 = _rbaa(address & 0xFF0000, a2_length)
+
+    for i = 1, #a2 do
+        a1[#a1 + 1] = a2[i]
+    end
+
+    return a1
+end
+
 local function read_u16_le_array(res, address, length)
-    local bytes = memory.read_bytes_as_array(address, length * 2)
+    local bytes = read_bytes_as_array(address, length * 2)
     for i = 1, length do
         res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
     end
@@ -408,7 +430,7 @@ local function get_enemy_header(enemy_id)
     local header = _ENEMY_HEADERS[enemy_id]
 
     if not header then
-        local bytes = memory.read_bytes_as_array(0xA00000 | enemy_id, 0x40)
+        local bytes = read_bytes_as_array(0xA00000 | enemy_id, 0x40)
         local drop_chances = table_u16_le(bytes, 0x3B)
         header = {
             max_health = table_u16_le(bytes, 0x05),
@@ -476,7 +498,7 @@ local function read_new_memory()
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
     RANDOM = mainmemory.read_u16_le(0x05E5)
-    ROOM_WIDTH = mainmemory.read_u16_le(0x07A5)
+    ROOM_WIDTH = mainmemory.read_u8(0x07A5)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
     SAMUS_HEALTH, SAMUS_HEALTH_MAX = read_bi_u16_le(0x7E09C2)
@@ -1150,32 +1172,37 @@ local function draw_blocks()
         build_slopes()
     end
 
-    local read_bytes_as_array = memory.read_bytes_as_array
     local drawPolygon = gui.drawPolygon
     local drawRectangle = gui.drawRectangle
     local type = type
 
     local line_length = 17 + (PADDING_X >> 3)
-    local block_x_offset = OFFSET_X % 16
-    local block_y_offset = OFFSET_Y % 16
-    local screen_offset = (OFFSET_Y // 16) * ROOM_WIDTH + (OFFSET_X // 16)
+
     for y = 0, 14 + (PADDING_Y >> 3) do
-        local block_y = (y << 4) - block_y_offset
-        local index_offset = screen_offset + y * ROOM_WIDTH
-        local line_data = read_bytes_as_array(0x7F0002 + (index_offset << 1), line_length << 1)
-        local line_bts = read_bytes_as_array(0x7F6402 + index_offset, line_length)
+        local pos_y = (y << 4) - (OFFSET_Y % 16)
+
+        -- block index offset for the current line
+        -- ref: 94:95F5
+        -- the game computes the block index using 8-bit multiplication, thus
+        -- the "& 0xFF". ROOM_WIDTH is already read as a u8.
+        local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * ROOM_WIDTH + OFFSET_X // 16
+
+        -- data accesses wrap accross bank boundaries
+        local line_data = read_bytes_as_array(0x7F0000 | ((0x0002 + (index_offset << 1)) & 0xFFFF), line_length << 1)
+        local line_bts = read_bytes_as_array(0x7F0000 | ((0x6402 + index_offset) & 0xFFFF), line_length)
+
         for x = 0, 16 + (PADDING_X >> 3) do
-            local block_x = (x << 4) - block_x_offset
+            local pos_x = (x << 4) - (OFFSET_X % 16)
             local line_index = x + 1
             local block_type = line_data[line_index << 1] >> 4
             local block = SIMPLE_OUTLINES[block_type + 1] or
                 COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_bts, 224)
             if type(block) == "number" then
                 if block ~= 0 then
-                    drawRectangle(block_x, block_y, 15, 15, block)
+                    drawRectangle(pos_x, pos_y, 15, 15, block)
                 end
             else -- type(block) == "table"
-                drawPolygon(block, block_x, block_y, TILE_COLOR_SLOPE)
+                drawPolygon(block, pos_x, pos_y, TILE_COLOR_SLOPE)
             end
         end
     end
