@@ -32,6 +32,7 @@ local HUD_ROW_4 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 4)
 local HUD_ROW_5 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 5)
 local HUD_ROW_6 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 6)
 local HUD_ROW_7 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 7)
+local HUD_ROW_8 = HUD_ROW_0 + (HUD_ROW_HEIGHT * 8)
 
 -- tile hitbox colors  0xAARRGGBB
 local TILE_COLOR_AIR = 0x00000000
@@ -307,6 +308,7 @@ local POWERBOMB_TIMER = 0
 local POWERBOMB_X = 0
 local POWERBOMB_Y = 0
 local RANDOM = 0
+local ROOM_PTR = 0
 local ROOM_WIDTH = 0
 local SAMUS_DASH = 0
 local SAMUS_DIRECTION_X = 0
@@ -359,6 +361,11 @@ local ENEMY_PROJECTILE_YS = {}
 local ENEMY_PROJECTILE_RADIUSES = {}
 local ENEMY_PROJECTILE_TIMERS = {}
 
+
+-----------------------------
+-- SM arcade
+local ARCADE_POINTS = 0
+local ARCADE_TIMER = 0
 
 -----------------------------
 -- other frame constants
@@ -456,11 +463,19 @@ local function read_enemy_data(res)
             -- skip suby
             radius_x = table_u16_le(bytes, offset + 10),
             radius_y = table_u16_le(bytes, offset + 12),
+            props = table_u16_le(bytes, offset + 14),
+            ai = table_u16_le(bytes, offset + 18),
             health = table_u16_le(bytes, offset + 20),
             ilist_ptr = table_u16_le(bytes, offset + 26),
             ilist_timer = table_u16_le(bytes, offset + 28),
+            hurt_timer = table_u16_le(bytes, offset + 36),
             iframes = table_u16_le(bytes, offset + 40),
+            ai1 = table_u16_le(bytes, offset + 48),
+            ai2 = table_u16_le(bytes, offset + 50),
+            ai3 = table_u16_le(bytes, offset + 52),
             ai4 = table_u16_le(bytes, offset + 54),
+            ai5 = table_u16_le(bytes, offset + 56),
+            ai6 = table_u16_le(bytes, offset + 58),
         }
     end
 end
@@ -498,6 +513,7 @@ local function read_new_memory()
     POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
     RANDOM = mainmemory.read_u16_le(0x05E5)
+    ROOM_PTR = mainmemory.read_u16_le(0x079B)
     ROOM_WIDTH = mainmemory.read_u8(0x07A5)
     SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
     SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
@@ -520,7 +536,7 @@ local function read_new_memory()
     SAMUS_Y_ACCEL_WATER = SAMUS_Y_ACCEL_WATER or (memory.read_u16_le(0x909EA9) << 16) | memory.read_u16_le(0x909EA3)
     SCREEN_X = mainmemory.read_u16_le(0x0911)
     SCREEN_Y = mainmemory.read_u16_le(0x0915)
-    SPEED_LEVEL = mainmemory.read_u8(0x0B3F)
+    SPEED_LEVEL = mainmemory.read_u16_le(0x0B3F)
     SPARK_TIMER = mainmemory.read_u16_le(0x0A68)
     WEAPON_COOLDOWN = mainmemory.read_u16_le(0x0CCC)
 
@@ -542,6 +558,9 @@ local function read_new_memory()
     ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
     read_u16_le_array(ENEMY_PROJECTILE_TIMERS, 0x7E19DF, 18)
 
+    ARCADE_POINTS = memory.read_u16_le(0x7FFFA0)
+    ARCADE_TIMER = memory.read_u16_le(0x7FFFEA)
+
     if CENTER_SAMUS then
         OFFSET_X = (SAMUS_X >> 16) - 128 - PADDING_X
         OFFSET_Y = (SAMUS_Y >> 16) - 112 - PADDING_Y
@@ -553,7 +572,13 @@ local function read_new_memory()
     SAMUS_DY = math.abs(SAMUS_Y - OLD_SAMUS_Y)
 end
 
-local function gameplay()
+local function update_frame_no()
+    local new_frame_no = emu.framecount()
+    SEEKED = new_frame_no ~= FRAME_NO + 1
+    FRAME_NO = new_frame_no
+end
+
+local function enable_draw()
     -- TODO return false during pause
     return (0x08 <= GAME_STATE and GAME_STATE <= 0x14) or
         GAME_STATE == 0x2A
@@ -606,6 +631,28 @@ local function predict_jump_speed()
     return (speed << 16) | subspeed
 end
 
+-- returns average vertical speed during space jumps or wall jumps
+-- initial = initial jump speed
+-- held = number of frames where the jump button is held
+-- released = number of frames where the jump button isn't pressed
+local function avg_jump_speed(initial, held, released)
+    return math.floor((2 * initial * held - 7168 * (held * held + released * released)) / 2 / (held + released))
+end
+
+local function max_avg_jump_speed(initial, released)
+    local max_held = initial // 7168
+    local imax = 0
+    local max = 0
+    for held = 1, max_held do
+        local speed = avg_jump_speed(initial, held, released)
+        if max < speed then
+            imax = held
+            max = speed
+        end
+    end
+    return imax, max
+end
+
 local function draw_background()
     if CENTER_SAMUS then
         gui.drawRectangle(PADDING_X, PADDING_Y, 256, 224, 0xA0000000, 0xA0000000)
@@ -624,8 +671,8 @@ local function draw_samus_hitbox()
 
     -- walljump lines
     -- TODO some cases of walljump check are not shown
-    local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x81)
-    local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x82)
+    local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x1B) or (SAMUS_POSE == 0x81)
+    local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x1C) or (SAMUS_POSE == 0x82)
     local pressing_right = (INPUT & BUTTON_RIGHT) ~= 0
     local pressing_left = (INPUT & BUTTON_LEFT) ~= 0
     if (spinning_left and pressing_left) or (spinning_right and pressing_left and pressing_right) then
@@ -1013,6 +1060,87 @@ local function draw_enemy_projectile_hitboxes()
     end
 end
 
+local function draw_phantoon_helpers()
+    if ROOM_PTR ~= 0xCD13 or ENEMY_COUNT < 3 then
+        -- not in phantoon's room, or phantoon's dead
+        return
+    end
+
+    -- ref: A7:****
+    -- pick first pattern: D596
+    -- pick next pattern: D076
+
+    local ai = ENEMY_DATA[1].ai
+    --local ilist_ptr = ENEMY_DATA[1].ilist_ptr
+    local ilist_timer = ENEMY_DATA[1].ilist_timer
+    local hurt_timer = ENEMY_DATA[1].hurt_timer
+    --local p_speed_lo = ENEMY_DATA[1].ai2
+    --local p_speed_hi = ENEMY_DATA[1].ai3
+    local fn_timer = ENEMY_DATA[1].ai5
+    local fn_ptr = ENEMY_DATA[1].ai6
+    local eye_open_timer = ENEMY_DATA[2].ai1
+    local swooping_triggered = ENEMY_DATA[3].ai1
+    local round_damage = ENEMY_DATA[3].ai2
+
+    local is_tangible = (ENEMY_DATA[1].props & 0x0400) == 0
+
+    local function draw_super_window(x, y)
+        if is_tangible and ai & 0x0002 == 0 then
+            gui.text(x, y, "CAN SUPER", HUD_COLOR_HI)
+            return
+        end
+    end
+
+    local function draw_stun_timer(x, y)
+        local color
+        local text
+        if ai & 0x0002 ~= 0 then
+            text = string.format("Stun Timer:%4d", hurt_timer - 8)
+        else
+            text = "Stun Timer: ---"
+            color = HUD_COLOR_LO
+        end
+        gui.text(x, y, text, color)
+    end
+
+    local function draw_tangible(x, y)
+        if eye_open_timer > 0 then
+            gui.text(x, y, string.format("Eye CD:%8d", eye_open_timer))
+            return
+        end
+        if not is_tangible then
+            -- TODO show invincibility CD
+            if swooping_triggered then
+                gui.text(x, y, "Eye CD: opening")
+            else
+                gui.text(x, y, "Eye CD:       0", HUD_COLOR_HI)
+            end
+            return
+        end
+        gui.text(x, y, string.format("Close CD:%6d", fn_timer))
+    end
+
+    local function draw_round_damage(x, y)
+        local color
+        if not is_tangible then
+            color = HUD_COLOR_LO
+        end
+        local text = string.format("Round dmg:%5d", round_damage)
+        gui.text(x, y, text, color)
+    end
+
+    local function draw_fn_ptr(x, y)
+        local text = string.format("Fn Timer: %04Xh", fn_ptr)
+        gui.text(x, y, text)
+    end
+
+    draw_tangible(HUD_COLUMN_0, HUD_ROW_7)
+    draw_round_damage(HUD_COLUMN_0, HUD_ROW_8)
+
+    draw_stun_timer(HUD_COLUMN_1, HUD_ROW_7)
+    draw_fn_ptr(HUD_COLUMN_1, HUD_ROW_8)
+end
+
 -- Build and cache slope polygons
 -- polygon from slope S is stored at SLOPES[4 * S + 2 * flip_y + flip_x + 1]
 local SLOPES = {}
@@ -1185,6 +1313,7 @@ local function draw_blocks()
         -- ref: 94:95F5
         -- the game computes the block index using 8-bit multiplication, thus
         -- the "& 0xFF". ROOM_WIDTH is already read as a u8.
+        -- TODO OFFSET_X & 0xFFFF
         local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * ROOM_WIDTH + OFFSET_X // 16
 
         -- data accesses wrap accross bank boundaries
@@ -1204,6 +1333,15 @@ local function draw_blocks()
             else -- type(block) == "table"
                 drawPolygon(block, pos_x, pos_y, TILE_COLOR_SLOPE)
             end
+
+            --[[
+            if block_type == 0x03 then
+                -- special air
+                local textpos = client_transformPoint(pos_x + 1, pos_y + 1)
+                local text = string.format("%02Xh", line_bts[line_index])
+                gui.text(textpos.x, textpos.y, text)
+            end
+            -- ]]
         end
     end
 end
@@ -1220,6 +1358,44 @@ local function draw_slopekiller_line()
     -- TODO read unmorph_length from memory (for PAL, where unmorph is 5 frames)
     -- TODO pixel offset from level data
     -- TODO handle horizontal movement: 90:8EA9
+
+    local function samus_x_span(samus_x)
+        -- ref: 94:94B5
+        samus_x = samus_x >> 16
+        local a = (samus_x - SAMUS_RADIUS_X) & ~0x000F
+        local b = (samus_x + SAMUS_RADIUS_X - 1) & 0xFFFF
+        return (b - a) >> 4
+    end
+
+    local function check_tile_collision(samus_x, bottom_y, block_idx)
+        -- TODO
+        return false
+    end
+
+    local function check_collision(samus_x, bottom_y, frame_no)
+        local x_span = samus_x_span(samus_x)
+        local from, to, step
+        if frame_no & 1 == 0 then
+            -- TODO check if no +1
+            local samus_left_boundary = ((samus_x >> 16) - SAMUS_RADIUS_X) & 0xFFFF
+            from = ((bottom_y >> 4) & 0xFF) * (ROOM_WIDTH & 0xFF) + (samus_left_boundary >> 4)
+            to = from + 2 * x_span
+            step = -2
+        else
+            local samus_right_boundary = ((samus_x >> 16) + SAMUS_RADIUS_X - 1) & 0xFFFF
+            from = ((bottom_y >> 4) & 0xFF) * (ROOM_WIDTH & 0xFF) + (samus_right_boundary >> 4)
+            to = from - 2 * x_span
+            step = 2
+        end
+
+        for block_idx = from, to, step do
+            if check_tile_collision(samus_x, bottom_y, block_idx) then
+                return true
+            end
+        end
+
+        return false
+    end
 
     -- Up press lag: samus falls at full speed for one frame
     local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
@@ -1240,7 +1416,7 @@ local function draw_slopekiller_line()
     local in_air = lp == 0
     local fx_position = FX_POSITION
     local lava_position = LAVA_POSITION
-    local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or SAMUS_SPEED_Y
+    local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or (SAMUS_SPEED_Y + accel_y)
     while unmorph_length > 0 do
         -- TODO 90:A16C  94:86FE
         y = y + speed_y
@@ -1330,21 +1506,23 @@ local function draw_door_lag()
 
     local lag_msg
     if #breakdown == 0 then
-        lag_msg = string.format("Door lag %s 0 %s", op, done)
+        lag_msg = string.format("Door lag%s 0 %s", op, done)
     else
         local sum = _dlag_scroll + _dlag_sound
         if _dlag_fade_out > 0 or _dlag_seen_transition_end then
             sum = sum + _dlag_fade_out
         end
         local brkdwn = table.concat(breakdown, ", ")
-        lag_msg = string.format("Door lag %s%2d (%s) %s", op, sum, brkdwn, done)
+        lag_msg = string.format("Door lag%s%2d (%s) %s", op, sum, brkdwn, done)
     end
 
     gui.text(0, 0, lag_msg, HUD_COLOR_HI, "bottomleft")
 end
 
 local function mark_door_transitions_as_lag()
-    if OLD_GAME_STATE == 0x0B or GAME_STATE == 0x0B then
+    -- make it work even when read_new_memory hasn't been called
+    local game_state = mainmemory.read_u8(0x0998)
+    if OLD_GAME_STATE == 0x0B or game_state == 0x0B then
         tastudio.setlag(FRAME_NO, true)
     end
 end
@@ -1485,7 +1663,7 @@ local function draw_hud()
     end
 
     local function draw_speed_level(x, y)
-        local text = string.format("Speed lvl:%5d", SPEED_LEVEL)
+        local text = string.format("Speed lvl:%04Xh", SPEED_LEVEL)
         local color
         if SPEED_LEVEL == 0 then
             color = HUD_COLOR_LO
@@ -1535,6 +1713,16 @@ local function draw_hud()
         gui.text(x, y, text)
     end
 
+    local function draw_arcade_points(x, y)
+        local text = string.format("Points:%8d", ARCADE_POINTS)
+        gui.text(x, y, text)
+    end
+
+    local function draw_arcade_timer(x, y)
+        local text = string.format("Timer:%6d:%02d", ARCADE_TIMER >> 8, ARCADE_TIMER & 0xFF)
+        gui.text(x, y, text)
+    end
+
     draw_samus_dx(HUD_COLUMN_0, HUD_ROW_0)
     draw_samus_dy(HUD_COLUMN_0, HUD_ROW_1)
     draw_samus_x(HUD_COLUMN_0, HUD_ROW_2)
@@ -1555,6 +1743,8 @@ local function draw_hud()
     draw_fanfare_timer(HUD_COLUMN_2, HUD_ROW_2)
     draw_screen_x(HUD_COLUMN_2, HUD_ROW_3)
     draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
+    draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
+    draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
 end
 
 event.onframestart(read_old_memory)
@@ -1564,15 +1754,12 @@ event.onexit(function()
     client.SetGameExtraPadding(0, 0, 0, 0)
 end)
 client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
-read_new_memory()
+update_frame_no()
+mark_door_transitions_as_lag()
 while true do
-    do
-        local new_frame_no = emu.framecount()
-        SEEKED = new_frame_no ~= FRAME_NO + 1
-        FRAME_NO = new_frame_no
-    end
+    read_new_memory()
 
-    if gameplay() then
+    if enable_draw() then
         draw_background()
         draw_blocks()
         draw_samus_hitbox()
@@ -1583,6 +1770,7 @@ while true do
         draw_grapple_throw_speed()
         draw_enemy_hitboxes()
         draw_enemy_projectile_hitboxes()
+        draw_phantoon_helpers()
         draw_hud()
         draw_door_lag()
     end
@@ -1590,16 +1778,15 @@ while true do
     repeat
         -- don't run when seeking
 
-        mark_door_transitions_as_lag()
-
         -- double call to isseeking to avoid false positives
         -- when loading a savestate in tastudio.
-        local was_seeking = client.isseeking()
+        local was_seeking = client.isseeking() or client.isturbo()
 
         emu.frameadvance()
         gui.clearGraphics()
         gui.cleartext()
 
-        read_new_memory()
-    until not (was_seeking and client.isseeking())
+        update_frame_no()
+        mark_door_transitions_as_lag()
+    until not (was_seeking and (client.isseeking() or client.isturbo()))
 end
