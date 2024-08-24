@@ -1147,6 +1147,27 @@ local SLOPES = {}
 local function build_slopes()
     local slope_data = memory.read_bytes_as_array(0x948B2B, 0x20 << 4)
 
+    local function reduce_polygon(ps)
+        local i = 3
+        while i <= #ps do
+            local left_x = ps[i - 2][1]
+            local left_y = ps[i - 2][2]
+            local mid_x = ps[i - 1][1]
+            local mid_y = ps[i - 1][2]
+            local right_x = ps[i][1]
+            local right_y = ps[i][2]
+
+            local off_line = (right_x - left_x) * mid_y - (right_x - mid_x) * left_y - (mid_x - left_x) * right_y
+
+            if off_line == 0 then
+                table.remove(ps, i)
+            else
+                i = i + 1
+            end
+        end
+        return ps
+    end
+
     local ys = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
     local function build_slope(slope_index, flip_x, flip_y)
         for x = 0, 15 do
@@ -1200,7 +1221,7 @@ local function build_slopes()
             end
         end
 
-        return points
+        return reduce_polygon(points)
     end
 
     for i = 0, 0x1F do
