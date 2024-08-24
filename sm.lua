@@ -9,9 +9,13 @@
 local PADDING_X = 0
 local PADDING_Y = 0
 
--- whether to center on samus's hitbox instead of
--- aligning hitboxes on the game screen
-local CENTER_SAMUS = false
+-- whether to center on samus's hitbox instead of aligning hitboxes on the game
+-- screen.
+--
+-- nil = auto (only when samus is offscreen)
+-- false = align hitboxes on game screen
+-- true = center samus' hitbox
+local FORCE_CENTER_SAMUS = nil
 
 -- expected size of the font in pixels
 local GUI_FONT_SIZE = 16
@@ -369,6 +373,7 @@ local ARCADE_TIMER = 0
 
 -----------------------------
 -- other frame constants
+local CENTER_SAMUS = nil
 local OFFSET_X = 0
 local OFFSET_Y = 0
 local SAMUS_DX = 0
@@ -560,6 +565,19 @@ local function read_new_memory()
 
     ARCADE_POINTS = memory.read_u16_le(0x7FFFA0)
     ARCADE_TIMER = memory.read_u16_le(0x7FFFEA)
+
+    CENTER_SAMUS = FORCE_CENTER_SAMUS
+    if CENTER_SAMUS == nil then
+        if GAME_STATE == 0x08 then
+            local samus_x_px = SAMUS_X >> 16
+            local samus_y_px = SAMUS_Y >> 16
+            CENTER_SAMUS = (samus_x_px < SCREEN_X) or (SCREEN_X + 256 < samus_x_px) or
+                (samus_y_px < SCREEN_Y) or (SCREEN_Y + 224 < samus_y_px)
+        else
+            -- don't center on room transitions
+            CENTER_SAMUS = false
+        end
+    end
 
     if CENTER_SAMUS then
         OFFSET_X = (SAMUS_X >> 16) - 128 - PADDING_X
