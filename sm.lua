@@ -1330,39 +1330,50 @@ local function draw_blocks()
     for y = 0, 14 + (PADDING_Y >> 3) do
         local pos_y = (y << 4) - (OFFSET_Y % 16)
 
-        -- block index offset for the current line
-        -- ref: 94:95F5
-        -- the game computes the block index using 8-bit multiplication, thus
-        -- the "& 0xFF". ROOM_WIDTH is already read as a u8.
-        -- TODO OFFSET_X & 0xFFFF
-        local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * ROOM_WIDTH + OFFSET_X // 16
+        local draw_line = function(offset_x, length)
+            -- block index offset for the current line
+            -- ref: 94:95F5
+            -- the game computes the block index using 8-bit multiplication, thus
+            -- the "& 0xFF". ROOM_WIDTH is already read as a u8.
+            local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * ROOM_WIDTH + (offset_x & 0xFFF)
 
-        -- data accesses wrap accross bank boundaries
-        local line_data = read_bytes_as_array(0x7F0000 | ((0x0002 + (index_offset << 1)) & 0xFFFF), line_length << 1)
-        local line_bts = read_bytes_as_array(0x7F0000 | ((0x6402 + index_offset) & 0xFFFF), line_length)
+            -- data accesses wrap accross bank boundaries
+            local line_data = read_bytes_as_array(0x7F0000 | ((0x0002 + (index_offset << 1)) & 0xFFFF), length << 1)
+            local line_bts = read_bytes_as_array(0x7F0000 | ((0x6402 + index_offset) & 0xFFFF), length)
 
-        for x = 0, 16 + (PADDING_X >> 3) do
-            local pos_x = (x << 4) - (OFFSET_X % 16)
-            local line_index = x + 1
-            local block_type = line_data[line_index << 1] >> 4
-            local block = SIMPLE_OUTLINES[block_type + 1] or
-                COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_bts, 224)
-            if type(block) == "number" then
-                if block ~= 0 then
-                    drawRectangle(pos_x, pos_y, 15, 15, block)
+            for x = 0, length - 1 do
+                local pos_x = (x + offset_x) * 16 - OFFSET_X
+                local line_index = x + 1
+                local block_type = line_data[line_index << 1] >> 4
+                local block = SIMPLE_OUTLINES[block_type + 1] or
+                    COMPLEX_OUTLINES[block_type](index_offset + x, line_index, line_bts, 224)
+                if type(block) == "number" then
+                    if block ~= 0 then
+                        drawRectangle(pos_x, pos_y, 15, 15, block)
+                    end
+                else -- type(block) == "table"
+                    drawPolygon(block, pos_x, pos_y, TILE_COLOR_SLOPE)
                 end
-            else -- type(block) == "table"
-                drawPolygon(block, pos_x, pos_y, TILE_COLOR_SLOPE)
-            end
 
-            --[[
-            if block_type == 0x03 then
-                -- special air
-                local textpos = client_transformPoint(pos_x + 1, pos_y + 1)
-                local text = string.format("%02Xh", line_bts[line_index])
-                gui.text(textpos.x, textpos.y, text)
-            end
+                --[[
+                if block_type == 0x03 then
+                    -- special air
+                    local textpos = client_transformPoint(pos_x + 1, pos_y + 1)
+                    local text = string.format("%02Xh", line_bts[line_index])
+                    gui.text(textpos.x, textpos.y, text)
+                end
             -- ]]
+            end
+        end
+
+        -- if OFFSET_X is negative, part of the line is out of bounds and the
+        -- whole line is not stored in contiguous memory addresses.
+        if OFFSET_X >= 0 then
+            draw_line(OFFSET_X // 16, line_length)
+        else
+            local oob_length = math.ceil(-OFFSET_X // 16)
+            draw_line(OFFSET_X // 16, oob_length)
+            draw_line(0, line_length - oob_length)
         end
     end
 end
