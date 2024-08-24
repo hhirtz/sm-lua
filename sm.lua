@@ -1160,7 +1160,7 @@ local function build_slopes()
             local off_line = (right_x - left_x) * mid_y - (right_x - mid_x) * left_y - (mid_x - left_x) * right_y
 
             if off_line == 0 then
-                table.remove(ps, i)
+                table.remove(ps, i - 1)
             else
                 i = i + 1
             end
