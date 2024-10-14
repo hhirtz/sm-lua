@@ -303,6 +303,7 @@ local GRAPPLE_SPEED = 0
 local IFRAMES = 0
 local INITIAL_Y_SPEED = {}
 local INPUT = 0
+local INPUT_HANDLER = 0
 local ITEMS_EQUIPPED = 0
 local KNOCKBACK = 0
 local LAVA_POSITION = 0
@@ -386,6 +387,26 @@ local SEEKED = true
 -----------------------------
 -- actual code
 
+-- like print but prints numbers in hex
+local function print_hex(...)
+    local args = { ... }
+    for i = 1, #args do
+        local n = args[i]
+        if type(n) == "number" then
+            if n < 0x100 then
+                args[i] = string.format("%02Xh", n)
+            elseif n < 0x10000 then
+                args[i] = string.format("%04Xh", n)
+            elseif n < 0x1000000 then
+                args[i] = string.format("%06Xh", n)
+            else
+                args[i] = string.format("%Xh", n)
+            end
+        end
+    end
+    print(table.unpack(args))
+end
+
 local function client_transformPoint(x, y)
     return client.transformPoint(x - PADDING_X, y - PADDING_Y)
 end
@@ -446,6 +467,7 @@ local function get_enemy_header(enemy_id)
         local drop_chances = table_u16_le(bytes, 0x3B)
         header = {
             max_health = table_u16_le(bytes, 0x05),
+            bank = bytes[0x0D],
             drop_chances = drop_chances ~= 0 and (drop_chances - 0xF1F3) or nil,
         }
         _ENEMY_HEADERS[enemy_id] = header
@@ -454,14 +476,80 @@ local function get_enemy_header(enemy_id)
     return header
 end
 
+local _ENEMY_SPRITEMAP_HITBOXES = {}
+local function get_enemy_spritemap_hitboxes(ptr)
+    local hitbox = _ENEMY_SPRITEMAP_HITBOXES[ptr]
+
+    if not hitbox then
+        hitbox = {}
+
+        local n = memory.read_u8(ptr)
+        local p = ptr + 2
+
+        for _ = 1, n do
+            hitbox[#hitbox + 1] = {
+                left = memory.read_s16_le(p),
+                top = memory.read_s16_le(p + 2),
+                right = memory.read_s16_le(p + 4),
+                bottom = memory.read_s16_le(p + 6),
+            }
+            p = p + 12
+        end
+
+        _ENEMY_SPRITEMAP_HITBOXES[ptr] = hitbox
+    end
+
+    return hitbox
+end
+
+local _ENEMY_SPRITEMAPS = {}
+local function get_enemy_spritemap(bank, address)
+    bank = bank << 16
+    local ptr = bank | address
+
+    local spritemap = _ENEMY_SPRITEMAPS[ptr]
+
+    if not spritemap then
+        spritemap = {}
+
+        local n = memory.read_u8(ptr)
+        local p = ptr + 2
+
+        for _ = 1, n do
+            local x = memory.read_s16_le(p)
+            local y = memory.read_s16_le(p + 2)
+            local hitbox_ptr = memory.read_u16_le(p + 6)
+
+            if hitbox_ptr ~= 0 then
+                local hitboxes = get_enemy_spritemap_hitboxes(bank | hitbox_ptr)
+                spritemap[#spritemap + 1] = { x = x, y = y, hitboxes = hitboxes }
+            end
+
+            p = p + 8
+        end
+
+        _ENEMY_SPRITEMAPS[ptr] = spritemap
+    end
+
+    return spritemap
+end
+
 local function read_enemy_data(res)
     --local MAX_ENEMIES = 32
     local MAX_ENEMIES = ENEMY_COUNT
     local bytes = mainmemory.read_bytes_as_array(0x0F78, MAX_ENEMIES << 6)
     for i = 1, MAX_ENEMIES do
         local offset = (i - 1) * 0x40 + 1
+        local id = table_u16_le(bytes, offset)
+        local header = get_enemy_header(id)
+        local props_ext = table_u16_le(bytes, offset + 16)
+        local spritemap
+        if props_ext & 0x04 ~= 0 then
+            spritemap = get_enemy_spritemap(header.bank, table_u16_le(bytes, offset + 22))
+        end
         res[i] = {
-            id = table_u16_le(bytes, offset),
+            header = header,
+            id = id,
             x = table_u16_le(bytes, offset + 2),
             -- skip subx
             y = table_u16_le(bytes, offset + 6),
@@ -469,8 +557,10 @@ local function read_enemy_data(res)
             radius_x = table_u16_le(bytes, offset + 10),
             radius_y = table_u16_le(bytes, offset + 12),
             props = table_u16_le(bytes, offset + 14),
+            props_ext = props_ext,
             ai = table_u16_le(bytes, offset + 18),
             health = table_u16_le(bytes, offset + 20),
+            spritemap = spritemap,
             ilist_ptr = table_u16_le(bytes, offset + 26),
             ilist_timer = table_u16_le(bytes, offset + 28),
             hurt_timer = table_u16_le(bytes, offset + 36),
@@ -510,6 +600,7 @@ local function read_new_memory()
         read_u16_le_array(INITIAL_Y_SPEED, 0x909EB9, 36)
     end
     INPUT = mainmemory.read_u16_le(0x008B)
+    INPUT_HANDLER = mainmemory.read_u16_le(0x0A60)
     ITEMS_EQUIPPED = mainmemory.read_u16_le(0x09A2)
     KNOCKBACK = mainmemory.read_u16_le(0x18AA)
     LAVA_POSITION = mainmemory.read_s32_le(0x1960)
@@ -685,7 +776,14 @@ local function draw_samus_hitbox()
     local y1 = y - SAMUS_RADIUS_Y
     local x2 = x + SAMUS_RADIUS_X
     local y2 = y + SAMUS_RADIUS_Y
-    gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
+    local fg = 0xFFFFFFFF
+    local bg = 0x35FFFFFF
+    if INPUT_HANDLER ~= 0xE913 then
+        -- game does not accept inputs (or xray is used the intended way)
+        fg = 0xFF803535
+        bg = 0x35803535
+    end
+    gui.drawBox(x1, y1, x2, y2, fg, bg)
 
     -- walljump lines
     -- TODO some cases of walljump check are not shown
@@ -701,8 +799,8 @@ local function draw_samus_hitbox()
 end
 
 local function draw_speed_percent()
-    if GRAPPLE_FUNC == 0xC79D then
-        -- swinging with grapple
+    if GRAPPLE_FUNC == 0xC79D or INPUT_HANDLER ~= 0xE913 then
+        -- swinging with grapple or game doesnt accept inputs
         return
     end
 
@@ -892,22 +990,41 @@ local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
         local enemy = ENEMY_DATA[i]
         if enemy.id ~= 0 then
+            local ex = enemy.x - OFFSET_X
+            local ey = enemy.y - OFFSET_Y
+
             local x = enemy.x - enemy.radius_x - OFFSET_X
             local y = enemy.y - enemy.radius_y - OFFSET_Y
 
-            -- TODO extended sprite map
             gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
 
-            local enemy_header = get_enemy_header(enemy.id)
-            local max_health = enemy_header.max_health
+            if false and enemy.spritemap and enemy.ai ~= 4 then
+                -- enemy not frozen, draw extended spritemap
+                for is = 1, #enemy.spritemap do
+                    local spritemap = enemy.spritemap[is]
+                    local sx = ex + spritemap.x
+                    local sy = ey + spritemap.y
+                    for ih = 1, #spritemap.hitboxes do
+                        local hitbox = spritemap.hitboxes[ih]
+                        gui.drawBox(
+                            sx + hitbox.left,
+                            sy + hitbox.top,
+                            sx + hitbox.right,
+                            sy + hitbox.bottom,
+                            0xFFFF0000,
+                            0x35FF0000)
+                    end
+                end
+            end
 
             local textpos = client_transformPoint(x + 1, y + 1)
             local text
             if enemy.iframes ~= 0 then
                 text = string.format("hp: %d/%d\ninv: %d",
-                    enemy.health, max_health, enemy.iframes)
+                    enemy.health, enemy.header.max_health, enemy.iframes)
             else
-                text = string.format("hp: %d/%d", enemy.health, max_health)
+                text = string.format("hp: %d/%d",
+                    enemy.health, enemy.header.max_health)
             end
 
             if enemy.id == 0xE1FF then
@@ -1389,7 +1506,7 @@ local function draw_blocks()
         if OFFSET_X >= 0 then
             draw_line(OFFSET_X // 16, line_length)
         else
-            local oob_length = math.ceil(-OFFSET_X // 16)
+            local oob_length = math.ceil(-OFFSET_X / 16)
             draw_line(OFFSET_X // 16, oob_length)
             draw_line(0, line_length - oob_length)
         end
@@ -1405,7 +1522,7 @@ local function draw_slopekiller_line()
         return
     end
 
-    -- TODO read unmorph_length from memory (for PAL, where unmorph is 5 frames)
+    -- TODO read unmorph_length from memory (for PAL, where unmorph is 4 frames)
     -- TODO pixel offset from level data
     -- TODO handle horizontal movement: 90:8EA9
 
@@ -1453,6 +1570,7 @@ local function draw_slopekiller_line()
     -- crouching/unmorphing pose radius (ref: 91:B629)
     y = y + 0x100000
 
+    --local unmorph_length = 4 -- for PAL
     local unmorph_length = 6
     local lp = liquid_physics()
     local accel_y = SAMUS_Y_ACCEL_AIR
@@ -1733,13 +1851,11 @@ local function draw_hud()
     local function draw_jump_speed(x, y)
         local jump_speed = predict_jump_speed()
         local text
+        local color
         if jump_speed then
             text = string.format("Jump:%4d.%05d", jump_speed >> 16, jump_speed & 0xFFFF)
         else
             text = "Jump:   -.-----"
-        end
-        local color
-        if not jump_speed then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1793,8 +1909,8 @@ local function draw_hud()
     draw_fanfare_timer(HUD_COLUMN_2, HUD_ROW_2)
     draw_screen_x(HUD_COLUMN_2, HUD_ROW_3)
     draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
-    draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
-    draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
+    --draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
+    --draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
 end
 
 event.onframestart(read_old_memory)
