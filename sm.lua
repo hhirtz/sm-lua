@@ -411,7 +411,7 @@ local function print_hex(...)
 end
 
 local function client_transformPoint(x, y)
-    return client.transformPoint(x - PADDING_X, y - PADDING_Y)
+    return client.transformPoint(x - PADDING_X, y - PADDING_Y + 8)
 end
 
 local function u8_to_s8(n)
@@ -1956,7 +1956,7 @@ event.onexit(function()
     gui.cleartext()
     client.SetGameExtraPadding(0, 0, 0, 0)
 end)
-client.SetGameExtraPadding(PADDING_X, PADDING_Y, PADDING_X, PADDING_Y)
+client.SetGameExtraPadding(PADDING_X, PADDING_Y - 8, PADDING_X, PADDING_Y)
 update_frame_no()
 mark_door_transitions_as_lag()
 while true do
