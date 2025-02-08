@@ -1,26 +1,30 @@
 -- Super Metroid TAS script
--- for bizhawk 2.9
+-- for bizhawk 2.9/2.10
 
 -----------------------------
 -- script settings
 
 -- padding in pixels, to show tiles and entities outside the game display
 -- this impacts performance. must be positive
-local PADDING_X = 0
-local PADDING_Y = 0
+local PADDING_X = 64
+local PADDING_Y = 64
 
 -- whether to center on samus's hitbox instead of aligning hitboxes on the game
 -- screen.
 --
 -- nil = auto (only when samus is offscreen)
 -- false = align hitboxes on game screen
--- true = center samus' hitbox
+-- true = center on samus' hitbox
 local FORCE_CENTER_SAMUS = nil
 
--- expected size of the font in pixels
+-- Color of block BTS values (or nil to not print BTS)
+--                0xAARRGGBB or nil
+local BTS_COLOR = 0xFFAAAAFF
+
+-- expected size of bizhawk's font in pixels
 local GUI_FONT_SIZE = 16
 
--- hud settings
+-- hud settings      0xAARRGGBB
 local HUD_COLOR_LO = 0xA0FFFFFF
 local HUD_COLOR_HI = 0xFFFFFF00
 local HUD_COLUMN_WIDTH = 164
@@ -46,7 +50,7 @@ local TILE_COLOR_ERROR = 0xFFFF0000
 local TILE_COLOR_SLOPE = 0xA0FFFFFF
 local TILE_COLOR_SOLID = 0xA0FFFFFF
 local TILE_COLOR_SPECIAL = 0xFF0000FF
-local TILE_COLOR_SPIKE_AIR = 0xC08080FF
+local TILE_COLOR_SPIKE = 0xC08080FF
 
 
 -----------------------------
@@ -289,7 +293,6 @@ local ITEM_XRAY = 1 << 15
 
 -----------------------------
 -- memory values
-local CERES_STEAM_PTRS = {}
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
@@ -584,9 +587,6 @@ local function read_old_memory()
 end
 
 local function read_new_memory()
-    if #CERES_STEAM_PTRS == 0 then
-        read_u16_le_array(CERES_STEAM_PTRS, 0xA6EFF5, 6)
-    end
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
@@ -688,9 +688,9 @@ local function update_frame_no()
 end
 
 local function enable_draw()
-    -- TODO return false during pause
-    return (0x08 <= GAME_STATE and GAME_STATE <= 0x14) or
-        GAME_STATE == 0x2A
+    return (0x08 <= GAME_STATE and GAME_STATE <= 0x14) or -- gameplay, room transitions, pause menu and start of death animation
+        GAME_STATE == 0x2A or                             -- demo
+        GAME_STATE == 0x1B                                -- reserves auto refill
 end
 
 local function next_random(prev)
@@ -779,7 +779,6 @@ local function draw_samus_hitbox()
     local fg = 0xFFFFFFFF
     local bg = 0x35FFFFFF
     if INPUT_HANDLER ~= 0xE913 then
-        -- game does not accept inputs (or xray is used the intended way)
         fg = 0xFF803535
         bg = 0x35803535
     end
@@ -998,8 +997,9 @@ local function draw_enemy_hitboxes()
 
             gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
 
-            if false and enemy.spritemap and enemy.ai ~= 4 then
+            if enemy.id ~= 0xE2BF and enemy.spritemap and enemy.ai ~= 4 then
                 -- enemy not frozen, draw extended spritemap
+                -- TODO make it work with kraid (E2BF)
                 for is = 1, #enemy.spritemap do
                     local spritemap = enemy.spritemap[is]
                     local sx = ex + spritemap.x
@@ -1029,7 +1029,7 @@ local function draw_enemy_hitboxes()
 
             if enemy.id == 0xE1FF then
                 local n = time_until_steam_hits(enemy)
-                text = string.format("%s\nhitting in %df", text, n)
+                text = string.format("%s\nhits in %df", text, n)
             end
 
             gui.text(textpos.x, textpos.y, text)
@@ -1276,6 +1276,57 @@ local function draw_phantoon_helpers()
     draw_fn_ptr(HUD_COLUMN_1, HUD_ROW_8)
 end
 
+local _RIDLEY_STATES = {
+    [0xA354] = "Start, speed reset",
+    [0xA35B] = "Start, 1st frame",
+    [0xA377] = "Start, wait",
+    [0xA389] = "Start, eyes appear",
+    [0xA3DF] = "Start, body appears",
+    [0xA455] = "Start, roar",
+    [0xA478] = "Start, raise acid",
+    [0xB2F3] = "Start, misc setup",
+    [0xB321] = "Change AI",
+    [0xB3EC] = "Move to center, 1st frame",
+    [0xB3F8] = "Move to center",
+    [0xB5C4] = "Pre-pogo, 1st frame",
+    [0xB5E5] = "Pre-pogo, spinjump check, 1st frame",
+    [0xB613] = "Pre-pogo, spinjump check",
+    [0xB6A7] = "Pogo, fly and turn to position",
+    [0xB6DD] = "Pogo, extend tail",
+    [0xB70E] = "Pogo, going down",
+    [0xB7B9] = "Pogo, going up",
+    [0xBAB7] = "Lunge/pwrbmb check/death check",
+    [0xBBC4] = "Hold Samus, move to target",
+    [0xBBF1] = "Drop Samus",
+    [0xBC2E] = "Drop Samus, cry",
+    [0xBD4E] = "Evade powerbomb",
+    [0xC551] = "Death, move to spot",
+    [0xC538] = "Death, move to 80;148",
+    [0xC588] = "Death, explosion",
+    [0xC5A8] = "Death, disable ridley",
+    [0xC5C8] = "Death, wait 20 frames",
+    [0xC5DA] = "Death, spawn drops after wait",
+    [0xC600] = "Dead",
+}
+local function draw_ridley_helpers()
+    if ROOM_PTR ~= 0xB32E or ENEMY_COUNT < 1 then
+        -- not in ridley's room, or ridley's dead
+        return
+    end
+
+    -- ref: A6:****
+
+    local fn_ptr = ENEMY_DATA[1].ai1
+
+    local function draw_fn_ptr(x, y)
+        local state = _RIDLEY_STATES[fn_ptr] or "???"
+        local text = string.format("State: %04Xh \"%s\"", fn_ptr, state)
+        gui.text(x, y, text)
+    end
+
+    draw_fn_ptr(HUD_COLUMN_2, HUD_ROW_5)
+end
+
 -- Build and cache slope polygons
 -- polygon from slope S is stored at SLOPES[4 * S + 2 * flip_y + flip_x + 1]
 local SLOPES = {}
@@ -1367,19 +1418,37 @@ local function build_slopes()
     end
 end
 
+local _BLOCK_SYMBOLS = {
+    false, -- 0x00: air
+    false, -- 0x01: slope
+    "!",   -- 0x02: spike air
+    " ",   -- 0x03: special air
+    "X",   -- 0x04: shootable air
+    "_",   -- 0x05: horizontal extension
+    "?",   -- 0x06: unused air
+    "O",   -- 0x07: bombable air
+    false, -- 0x08: solid block
+    " ",   -- 0x09: door block
+    "!",   -- 0x0A: spike block
+    " ",   -- 0x0B: special block
+    "x",   -- 0x0C: shootable block
+    "|",   -- 0x0D: vertical extension
+    "g",   -- 0x0E: grapple block
+    "o",   -- 0x0F: bombable block
+}
 local SIMPLE_OUTLINES = {
-    TILE_COLOR_AIR,       -- 0x00: air
+    TILE_COLOR_AIR,     -- 0x00: air
     false,
-    TILE_COLOR_SPIKE_AIR, -- 0x02: spike air
-    TILE_COLOR_SPECIAL,   -- 0x03: special air
-    TILE_COLOR_AIR,       -- 0x04: shootable air
+    TILE_COLOR_SPIKE,   -- 0x02: spike air
+    TILE_COLOR_SPECIAL, -- 0x03: special air
+    TILE_COLOR_SPECIAL, -- 0x04: shootable air
     false,
-    TILE_COLOR_AIR,       -- 0x06: unused air
-    TILE_COLOR_AIR,       -- 0x07: bombable air
-    TILE_COLOR_SOLID,     -- 0x08: solid block
-    TILE_COLOR_DOOR,      -- 0x09: door block
-    TILE_COLOR_SPECIAL,   -- 0x0A: spike block
-    TILE_COLOR_SPECIAL,   -- 0x0B: special block
+    TILE_COLOR_AIR,     -- 0x06: unused air
+    TILE_COLOR_SPECIAL, -- 0x07: bombable air
+    TILE_COLOR_SOLID,   -- 0x08: solid block
+    TILE_COLOR_DOOR,    -- 0x09: door block
+    TILE_COLOR_SPECIAL, -- 0x0A: spike block
+    TILE_COLOR_SPECIAL, -- 0x0B: special block
     false,
     false,
     TILE_COLOR_SPECIAL, -- 0x0E: grapple block
@@ -1447,7 +1516,8 @@ local function draw_blocks()
         (GAME_STATE == 0x0B and (DOOR_TRANSITION_FUNC < 0xE2F7 or 0xE36E < DOOR_TRANSITION_FUNC)) or
         (GAME_STATE == 0x0C) or
         (GAME_STATE == 0x11) or
-        (0x12 <= GAME_STATE and GAME_STATE <= 0x14)
+        (0x12 <= GAME_STATE and GAME_STATE <= 0x14) or
+        GAME_STATE == 0x1B
     if not valid_level_data then
         return
     end
@@ -1490,14 +1560,14 @@ local function draw_blocks()
                     drawPolygon(block, pos_x, pos_y, TILE_COLOR_SLOPE)
                 end
 
-                --[[
-                if block_type == 0x03 then
-                    -- special air
-                    local textpos = client_transformPoint(pos_x + 1, pos_y + 1)
-                    local text = string.format("%02Xh", line_bts[line_index])
-                    gui.text(textpos.x, textpos.y, text)
+                if BTS_COLOR then
+                    local symbol = _BLOCK_SYMBOLS[block_type + 1]
+                    if symbol then
+                        local textpos = client_transformPoint(pos_x + 1, pos_y + 1)
+                        local text = string.format("%s%02X", symbol, line_bts[line_index])
+                        gui.text(textpos.x, textpos.y, text, BTS_COLOR)
+                    end
                 end
-            -- ]]
             end
         end
 
@@ -1522,47 +1592,14 @@ local function draw_slopekiller_line()
         return
     end
 
+    if SAMUS_DIRECTION_Y == 1 then
+        -- TODO make it work when going upwards
+        return
+    end
+
     -- TODO read unmorph_length from memory (for PAL, where unmorph is 4 frames)
     -- TODO pixel offset from level data
     -- TODO handle horizontal movement: 90:8EA9
-
-    local function samus_x_span(samus_x)
-        -- ref: 94:94B5
-        samus_x = samus_x >> 16
-        local a = (samus_x - SAMUS_RADIUS_X) & ~0x000F
-        local b = (samus_x + SAMUS_RADIUS_X - 1) & 0xFFFF
-        return (b - a) >> 4
-    end
-
-    local function check_tile_collision(samus_x, bottom_y, block_idx)
-        -- TODO
-        return false
-    end
-
-    local function check_collision(samus_x, bottom_y, frame_no)
-        local x_span = samus_x_span(samus_x)
-        local from, to, step
-        if frame_no & 1 == 0 then
-            -- TODO check if no +1
-            local samus_left_boundary = ((samus_x >> 16) - SAMUS_RADIUS_X) & 0xFFFF
-            from = ((bottom_y >> 4) & 0xFF) * (ROOM_WIDTH & 0xFF) + (samus_left_boundary >> 4)
-            to = from + 2 * x_span
-            step = -2
-        else
-            local samus_right_boundary = ((samus_x >> 16) + SAMUS_RADIUS_X - 1) & 0xFFFF
-            from = ((bottom_y >> 4) & 0xFF) * (ROOM_WIDTH & 0xFF) + (samus_right_boundary >> 4)
-            to = from - 2 * x_span
-            step = 2
-        end
-
-        for block_idx = from, to, step do
-            if check_tile_collision(samus_x, bottom_y, block_idx) then
-                return true
-            end
-        end
-
-        return false
-    end
 
     -- Up press lag: samus falls at full speed for one frame
     local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
@@ -1937,6 +1974,7 @@ while true do
         draw_enemy_hitboxes()
         draw_enemy_projectile_hitboxes()
         draw_phantoon_helpers()
+        draw_ridley_helpers()
         draw_hud()
         draw_door_lag()
     end
