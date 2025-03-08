@@ -13,6 +13,10 @@ function client.ispaused() end
 ---@nodiscard
 function client.isseeking() end
 
+---@return boolean
+---@nodiscard
+function client.isturbo() end
+
 ---@param left integer
 ---@param top integer
 ---@param right integer
