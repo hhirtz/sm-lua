@@ -356,6 +356,8 @@ local PROJECTILES_X = {}
 local PROJECTILES_Y = {}
 local PROJECTILES_RADIUS_X = {}
 local PROJECTILES_RADIUS_Y = {}
+local PROJECTILES_VX = {}
+local PROJECTILES_VY = {}
 local BOMB_TIMERS = {}
 
 local ENEMY_COUNT = 0
@@ -420,8 +422,9 @@ end
 
 -- fixes memory.read_bytes_as_array to make it read the correct data when
 -- address+length overflows the bank.
-local _rbaa = memory.read_bytes_as_array
 local function read_bytes_as_array(address, length)
+    local _rbaa = memory.read_bytes_as_array
+
     local bank_local = address & 0xFFFF
     if bank_local + length <= 0xFFFF then
         return _rbaa(address, length)
@@ -444,6 +447,14 @@ local function read_u16_le_array(res, address, length)
     local bytes = read_bytes_as_array(address, length * 2)
     for i = 1, length do
         res[i] = (bytes[2 * i] << 8) | bytes[2 * i - 1]
+    end
+end
+
+local function read_s16_le_array(res, address, length)
+    local bytes = read_bytes_as_array(address, length * 2)
+    for i = 1, length do
+        local n = (bytes[2 * i] << 8) | bytes[2 * i - 1]
+        res[i] = (n & 0x7FFF) - (n & 0x8000)
     end
 end
 
@@ -640,6 +651,8 @@ local function read_new_memory()
     read_u16_le_array(PROJECTILES_Y, 0x7E0B78, 10)
     read_u16_le_array(PROJECTILES_RADIUS_X, 0x7E0BB4, 10)
     read_u16_le_array(PROJECTILES_RADIUS_Y, 0x7E0BC8, 10)
+    read_s16_le_array(PROJECTILES_VX, 0x7E0BDC, 10)
+    read_s16_le_array(PROJECTILES_VY, 0x7E0BF0, 10)
     read_u16_le_array(BOMB_TIMERS, 0x7E0C7C, 10)
 
     ENEMY_COUNT = mainmemory.read_u8(0x0E4E)
@@ -829,13 +842,20 @@ local function draw_projectile_hitboxes()
         if PROJECTILES_RADIUS_X[i] ~= 0 or PROJECTILES_RADIUS_Y[i] ~= 0 or BOMB_TIMERS[i] ~= 0 then
             local x = PROJECTILES_X[i] - OFFSET_X
             local y = PROJECTILES_Y[i] - OFFSET_Y
+            local vx = PROJECTILES_VX[i]
+            local vy = PROJECTILES_VY[i]
+
             local x1 = x - PROJECTILES_RADIUS_X[i]
             local y1 = y - PROJECTILES_RADIUS_Y[i]
             local x2 = x + PROJECTILES_RADIUS_X[i]
             local y2 = y + PROJECTILES_RADIUS_Y[i]
             gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
-            if BOMB_TIMERS[i] ~= 0 then
+            if vx ~= 0 or vy ~= 0 then
+                local textpos = client_transformPoint(x1, y1)
+                local text = string.format("v: %.2f;%.2f", vx / 0x100, vy / 0x100)
+                gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, text)
+            elseif BOMB_TIMERS[i] ~= 0 then
                 local textpos = client_transformPoint(x1, y1)
                 gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, BOMB_TIMERS[i])
             end
