@@ -293,10 +293,12 @@ local ITEM_XRAY = 1 << 15
 
 -----------------------------
 -- memory values
+-- TODO make these into a table
 local CHARGE_COUNTER = 0
 local DOOR_TRANSITION_FUNC = 0
 local OLD_DOOR_TRANSITION_FUNC = 0
 local ENEMY_DROP_CHANCES = nil
+local FRAME_COUNTER = 0
 local FX_POSITION = 0
 local GAME_STATE = 0
 local OLD_GAME_STATE = 0
@@ -601,6 +603,7 @@ local function read_new_memory()
     CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
     DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
     ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
+    FRAME_COUNTER = mainmemory.read_u16_le(0x05B6)
     FX_POSITION = mainmemory.read_s32_le(0x195C)
     GAME_STATE = mainmemory.read_u8(0x0998)
     GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
@@ -1227,23 +1230,54 @@ local function draw_phantoon_helpers()
 
     local ai = ENEMY_DATA[1].ai
     --local ilist_ptr = ENEMY_DATA[1].ilist_ptr
-    local ilist_timer = ENEMY_DATA[1].ilist_timer
+    --local ilist_timer = ENEMY_DATA[1].ilist_timer
     local hurt_timer = ENEMY_DATA[1].hurt_timer
-    --local p_speed_lo = ENEMY_DATA[1].ai2
-    --local p_speed_hi = ENEMY_DATA[1].ai3
-    local fn_timer = ENEMY_DATA[1].ai5
+    local flame_counter = ENEMY_DATA[1].ai1
+    --local p_speed = ENEMY_DATA[1].ai2 | (ENEMY_DATA[i].ai3 << 8)
+    local function u16_to_s16(n)
+        return (n & 0x7FFF) - (n & 0x8000)
+    end
+    local fn_timer = u16_to_s16(ENEMY_DATA[1].ai5)
     local fn_ptr = ENEMY_DATA[1].ai6
     local eye_open_timer = ENEMY_DATA[2].ai1
-    local swooping_triggered = ENEMY_DATA[3].ai1
+    --local swooping_triggered = ENEMY_DATA[3].ai1
     local round_damage = ENEMY_DATA[3].ai2
 
     local is_tangible = (ENEMY_DATA[1].props & 0x0400) == 0
 
-    local function draw_super_window(x, y)
-        if is_tangible and ai & 0x0002 == 0 then
-            gui.text(x, y, "CAN SUPER", HUD_COLOR_HI)
-            return
+    local function time_until_intro_ends()
+        if fn_ptr < 0xD4A9 or 0xD596 < fn_ptr then
+            -- not in fight intro
+            return 0
         end
+
+        local t = 0
+        local fn_timer2 = fn_timer
+        if fn_ptr <= 0xD4A9 then
+            -- spawn flames
+            t = t + fn_timer2 + 0x1E * (7 - flame_counter)
+            fn_timer2 = 0x1E
+        end
+        if fn_ptr <= 0xD4EE then
+            -- spin flames
+            t = t + fn_timer2
+            fn_timer2 = 0xF0
+        end
+        if fn_ptr <= 0xD508 then
+            -- start wavy fade in
+            t = t + fn_timer2
+            fn_timer2 = 0x78
+        end
+        if fn_ptr <= 0xD54A then
+            -- wavy fade in
+            if fn_timer2 > 0 then
+                t = t + fn_timer2
+                fn_timer2 = 0
+            end
+            t = t + fn_timer2 + 49
+            fn_timer2 = 0x1E
+        end
+        return t + fn_timer2
     end
 
     local function draw_stun_timer(x, y)
@@ -1258,21 +1292,20 @@ local function draw_phantoon_helpers()
         gui.text(x, y, text, color)
     end
 
-    local function draw_tangible(x, y)
-        if eye_open_timer > 0 then
-            gui.text(x, y, string.format("Eye CD:%8d", eye_open_timer))
-            return
+    local function draw_eye_timer(x, y)
+        local timer = eye_open_timer
+        local t_intro = time_until_intro_ends()
+        if t_intro > 0 and GAME_STATE == 0x08 then
+            -- predict first pattern
+            -- TODO accurate prediction during door transition
+            local pattern = ((FRAME_COUNTER + t_intro) >> 1) & 3
+            timer = ({ 720, 60, 360, 720, 360, 60, 360, 720 })[pattern + 1]
         end
-        if not is_tangible then
-            -- TODO show invincibility CD
-            if swooping_triggered then
-                gui.text(x, y, "Eye CD: opening")
-            else
-                gui.text(x, y, "Eye CD:       0", HUD_COLOR_HI)
-            end
-            return
+        local color
+        if timer == 0 then
+            color = HUD_COLOR_LO
         end
-        gui.text(x, y, string.format("Close CD:%6d", fn_timer))
+        gui.text(x, y, string.format("Open eye:%6d", timer), color)
     end
 
     local function draw_round_damage(x, y)
@@ -1285,11 +1318,11 @@ local function draw_phantoon_helpers()
     end
 
     local function draw_fn_ptr(x, y)
-        local text = string.format("Fn Timer: %04Xh", fn_ptr)
+        local text = string.format("AI:       %04Xh", fn_ptr)
         gui.text(x, y, text)
     end
 
-    draw_tangible(HUD_COLUMN_0, HUD_ROW_7)
+    draw_eye_timer(HUD_COLUMN_0, HUD_ROW_7)
     draw_round_damage(HUD_COLUMN_0, HUD_ROW_8)
 
     draw_stun_timer(HUD_COLUMN_1, HUD_ROW_7)
