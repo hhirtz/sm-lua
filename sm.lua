@@ -1015,8 +1015,8 @@ local function draw_enemy_hitboxes()
             local ex = enemy.x - OFFSET_X
             local ey = enemy.y - OFFSET_Y
 
-            local x = enemy.x - enemy.radius_x - OFFSET_X
-            local y = enemy.y - enemy.radius_y - OFFSET_Y
+            local x = ex - enemy.radius_x
+            local y = ey - enemy.radius_y
 
             gui.drawRectangle(x, y, enemy.radius_x << 1, enemy.radius_y << 1, 0xFFFF0000, 0x35FF0000)
 
@@ -1040,22 +1040,24 @@ local function draw_enemy_hitboxes()
                 end
             end
 
-            local textpos = client_transformPoint(x + 1, y + 1)
-            local text
+            local lines = {}
+            --lines[#lines + 1] = string.format("%04X", enemy.id)
+            lines[#lines + 1] = string.format("hp: %d/%d", enemy.health, enemy.header.max_health)
+            lines[#lines + 1] = string.format("props: %02X", enemy.props >> 8)
             if enemy.iframes ~= 0 then
-                text = string.format("hp: %d/%d\ninv: %d",
-                    enemy.health, enemy.header.max_health, enemy.iframes)
-            else
-                text = string.format("hp: %d/%d",
-                    enemy.health, enemy.header.max_health)
+                lines[#lines + 1] = string.format("iframes: %df", enemy.iframes)
             end
-
             if enemy.id == 0xE1FF then
+                -- steam
                 local n = time_until_steam_hits(enemy)
-                text = string.format("%s\nhits in %df", text, n)
+                lines[#lines + 1] = string.format("cd: %df", n)
+            elseif enemy.id == 0xEA3F then
+                -- wrecked ship spark generator
+                lines[#lines + 1] = string.format("cd: %df", enemy.ai6)
             end
 
-            gui.text(textpos.x, textpos.y, text)
+            local textpos = client_transformPoint(x + 1, y + 1)
+            gui.text(textpos.x, textpos.y, table.concat(lines, "\n"))
         end
     end
 end
