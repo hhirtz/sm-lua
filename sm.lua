@@ -1854,7 +1854,7 @@ local function draw_hud()
         elseif OLD_SAMUS_X > SAMUS_X then
             text = string.format("dx: <%4d.%05d", SAMUS_DX >> 16, SAMUS_DX & 0xFFFF)
         else
-            text = string.format("dx:     0.00000")
+            text = "dx:     0.00000"
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1868,7 +1868,7 @@ local function draw_hud()
         elseif OLD_SAMUS_Y > SAMUS_Y then
             text = string.format("dy: ^%4d.%05d", SAMUS_DY >> 16, SAMUS_DY & 0xFFFF)
         else
-            text = string.format("dy:     0.00000")
+            text = "dy:     0.00000"
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
