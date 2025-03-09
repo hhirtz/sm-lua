@@ -1676,7 +1676,17 @@ local function draw_slopekiller_line()
     local in_air = lp == 0
     local fx_position = FX_POSITION
     local lava_position = LAVA_POSITION
-    local speed_y = (SAMUS_SPEED_Y < 0) and 0x10000 or (SAMUS_SPEED_Y + accel_y)
+
+    local speed_y
+    if SAMUS_SPEED_Y >= 0 then
+        speed_y = SAMUS_SPEED_Y
+        if SAMUS_SPEED_Y >> 16 ~= SAMUS_SPEED_CAP_Y then
+            speed_y = speed_y + accel_y
+        end
+    else
+        speed_y = 0x10000
+    end
+
     while unmorph_length > 0 do
         -- TODO 90:A16C  94:86FE
         y = y + speed_y
