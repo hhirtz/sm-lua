@@ -1,9 +1,6 @@
 -- Super Metroid TAS script
 -- for bizhawk 2.9/2.10
 
------------------------------
--- script settings
-
 -- padding in pixels, to show tiles and entities outside the game display
 -- this impacts performance. must be positive
 local PADDING_X = 64
@@ -2013,6 +2010,12 @@ local function draw_hud()
     draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
     --draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
     --draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
+end
+
+if memory.getcurrentmemorydomain() ~= "System Bus" then
+    print(
+        "sm.lua requires the BSNESv115+ core, and won't work with Snes9x. Change cores in Config -> Profiles... -> Tool-assisted speedruns, then reopen the rom and toggle the script.")
+    return
 end
 
 event.onframestart(read_old_memory)
