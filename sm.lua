@@ -310,6 +310,7 @@ local M = {
     KNOCKBACK = 0,
     LAVA_POSITION = 0,
     MUSIC_TIMER = 0,
+    PLM_IDS = {},
     POWERBOMB_RADIUS = 0,
     POWERBOMB_TIMER = 0,
     POWERBOMB_X = 0,
@@ -617,6 +618,7 @@ local function read_new_memory()
     M.KNOCKBACK = mainmemory.read_u16_le(0x18AA)
     M.LAVA_POSITION = mainmemory.read_s32_le(0x1960)
     M.MUSIC_TIMER = mainmemory.read_u16_le(0x063F)
+    read_u16_le_array(M.PLM_IDS, 0x7E1C37, 40)
     M.POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
     M.POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
     M.POWERBOMB_X, M.POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
@@ -1992,6 +1994,21 @@ local function draw_hud()
         gui.text(x, y, text)
     end
 
+    local function draw_plm_count(x, y)
+        local plm_count = 0
+        for i = 1, 40 do
+            if M.PLM_IDS[i] ~= 0 then
+                plm_count = plm_count + 1
+            end
+        end
+        local text = string.format("PLMs:%7d/40", plm_count)
+        local color
+        if plm_count == 0 then
+            color = HUD_COLOR_LO
+        end
+        gui.text(x, y, text, color)
+    end
+
     local function draw_arcade_points(x, y)
         local text = string.format("Points:%8d", M.ARCADE_POINTS)
         gui.text(x, y, text)
@@ -2023,6 +2040,7 @@ local function draw_hud()
     draw_screen_x(HUD_COLUMN_2, HUD_ROW_3)
     draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
     draw_samus_reserves(HUD_COLUMN_2, HUD_ROW_5)
+    draw_plm_count(HUD_COLUMN_2, HUD_ROW_6)
     --draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
     --draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
 end
