@@ -1896,6 +1896,19 @@ local function draw_hud()
         gui.text(x, y, text)
     end
 
+    local function draw_samus_reserves(x, y)
+        local text = string.format("Reserves:%6d", SAMUS_HEALTH_RESERVE)
+        local color
+        if SAMUS_HEALTH_RESERVE_MAX == 0 then
+            if SAMUS_HEALTH_RESERVE == 0 then
+                color = HUD_COLOR_LO
+            else
+                color = HUD_COLOR_HI
+            end
+        end
+        gui.text(x, y, text, color)
+    end
+
     local function draw_beam_cooldown(x, y)
         local text = string.format("Weapon CD:%5d", WEAPON_COOLDOWN)
         local color
@@ -2008,6 +2021,7 @@ local function draw_hud()
     draw_fanfare_timer(HUD_COLUMN_2, HUD_ROW_2)
     draw_screen_x(HUD_COLUMN_2, HUD_ROW_3)
     draw_screen_y(HUD_COLUMN_2, HUD_ROW_4)
+    draw_samus_reserves(HUD_COLUMN_2, HUD_ROW_5)
     --draw_arcade_points(HUD_COLUMN_2, HUD_ROW_5)
     --draw_arcade_timer(HUD_COLUMN_2, HUD_ROW_6)
 end
