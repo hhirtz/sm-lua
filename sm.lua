@@ -290,85 +290,86 @@ local ITEM_XRAY = 1 << 15
 
 -----------------------------
 -- memory values
--- TODO make these into a table
-local CHARGE_COUNTER = 0
-local DOOR_TRANSITION_FUNC = 0
-local OLD_DOOR_TRANSITION_FUNC = 0
-local ENEMY_DROP_CHANCES = nil
-local FRAME_COUNTER = 0
-local FX_POSITION = 0
-local GAME_STATE = 0
-local OLD_GAME_STATE = 0
-local GRAPPLE_ANGLE = 0
-local GRAPPLE_FUNC = 0
-local GRAPPLE_SPEED = 0
-local IFRAMES = 0
-local INITIAL_Y_SPEED = {}
-local INPUT = 0
-local INPUT_HANDLER = 0
-local ITEMS_EQUIPPED = 0
-local KNOCKBACK = 0
-local LAVA_POSITION = 0
-local MUSIC_TIMER = 0
-local POWERBOMB_RADIUS = 0
-local POWERBOMB_TIMER = 0
-local POWERBOMB_X = 0
-local POWERBOMB_Y = 0
-local RANDOM = 0
-local ROOM_PTR = 0
-local ROOM_WIDTH = 0
-local SAMUS_DASH = 0
-local SAMUS_DIRECTION_X = 0
-local SAMUS_DIRECTION_Y = 0
-local SAMUS_HEALTH = 0
-local SAMUS_HEALTH_BOMB = 0
-local SAMUS_HEALTH_MAX = 0
-local SAMUS_HEALTH_RESERVE = 0
-local SAMUS_HEALTH_RESERVE_MAX = 0
-local SAMUS_MISSILES = 0
-local SAMUS_MISSILES_MAX = 0
-local SAMUS_POSE = 0
-local SAMUS_POWERBOMBS = 0
-local SAMUS_POWERBOMBS_MAX = 0
-local SAMUS_RADIUS_X = 0
-local SAMUS_RADIUS_Y = 0
-local SAMUS_SPEED_CAP_Y = nil
-local SAMUS_SPEED_X = 0
-local SAMUS_SPEED_Y = 0
-local OLD_SAMUS_SPEED_Y = 0
-local SAMUS_SUPERS = 0
-local SAMUS_SUPERS_MAX = 0
-local SAMUS_X = 0
-local OLD_SAMUS_X = 0
-local SAMUS_Y = 0
-local OLD_SAMUS_Y = 0
-local SAMUS_Y_ACCEL_AIR = nil
-local SAMUS_Y_ACCEL_LAVA = nil
-local SAMUS_Y_ACCEL_WATER = nil
-local SCREEN_X = 0
-local SCREEN_Y = 0
-local SPARK_TIMER = 0
-local SPEED_LEVEL = 0
-local WEAPON_COOLDOWN = 0
+local M = {
+    CHARGE_COUNTER = 0,
+    DOOR_TRANSITION_FUNC = 0,
+    OLD_DOOR_TRANSITION_FUNC = 0,
+    ENEMY_DROP_CHANCES = nil,
+    FRAME_COUNTER = 0,
+    FX_POSITION = 0,
+    GAME_STATE = 0,
+    OLD_GAME_STATE = 0,
+    GRAPPLE_ANGLE = 0,
+    GRAPPLE_FUNC = 0,
+    GRAPPLE_SPEED = 0,
+    IFRAMES = 0,
+    INITIAL_Y_SPEED = {},
+    INPUT = 0,
+    INPUT_HANDLER = 0,
+    ITEMS_EQUIPPED = 0,
+    KNOCKBACK = 0,
+    LAVA_POSITION = 0,
+    MUSIC_TIMER = 0,
+    POWERBOMB_RADIUS = 0,
+    POWERBOMB_TIMER = 0,
+    POWERBOMB_X = 0,
+    POWERBOMB_Y = 0,
+    RANDOM = 0,
+    ROOM_PTR = 0,
+    ROOM_WIDTH = 0,
+    SAMUS_DASH = 0,
+    SAMUS_DIRECTION_X = 0,
+    SAMUS_DIRECTION_Y = 0,
+    SAMUS_HEALTH = 0,
+    SAMUS_HEALTH_BOMB = 0,
+    SAMUS_HEALTH_MAX = 0,
+    SAMUS_HEALTH_RESERVE = 0,
+    SAMUS_HEALTH_RESERVE_MAX = 0,
+    SAMUS_MISSILES = 0,
+    SAMUS_MISSILES_MAX = 0,
+    SAMUS_POSE = 0,
+    SAMUS_POWERBOMBS = 0,
+    SAMUS_POWERBOMBS_MAX = 0,
+    SAMUS_RADIUS_X = 0,
+    SAMUS_RADIUS_Y = 0,
+    SAMUS_SPEED_CAP_Y = nil,
+    SAMUS_SPEED_X = 0,
+    SAMUS_SPEED_Y = 0,
+    OLD_SAMUS_SPEED_Y = 0,
+    SAMUS_SUPERS = 0,
+    SAMUS_SUPERS_MAX = 0,
+    SAMUS_X = 0,
+    OLD_SAMUS_X = 0,
+    SAMUS_Y = 0,
+    OLD_SAMUS_Y = 0,
+    SAMUS_Y_ACCEL_AIR = nil,
+    SAMUS_Y_ACCEL_LAVA = nil,
+    SAMUS_Y_ACCEL_WATER = nil,
+    SCREEN_X = 0,
+    SCREEN_Y = 0,
+    SPARK_TIMER = 0,
+    SPEED_LEVEL = 0,
+    WEAPON_COOLDOWN = 0,
 
-local PROJECTILES_X = {}
-local PROJECTILES_Y = {}
-local PROJECTILES_RADIUS_X = {}
-local PROJECTILES_RADIUS_Y = {}
-local PROJECTILES_VX = {}
-local PROJECTILES_VY = {}
-local BOMB_TIMERS = {}
+    PROJECTILES_X = {},
+    PROJECTILES_Y = {},
+    PROJECTILES_RADIUS_X = {},
+    PROJECTILES_RADIUS_Y = {},
+    PROJECTILES_VX = {},
+    PROJECTILES_VY = {},
+    BOMB_TIMERS = {},
 
-local ENEMY_COUNT = 0
-local ENEMY_DATA = {}
-local ENEMY_PROJECTILE_ENEMIES = {}
-local ENEMY_PROJECTILE_IDS = {}
-local ENEMY_PROJECTILE_INSTRS = {}
-local ENEMY_PROJECTILE_INSTR_TIMERS = {}
-local ENEMY_PROJECTILE_XS = {}
-local ENEMY_PROJECTILE_YS = {}
-local ENEMY_PROJECTILE_RADIUSES = {}
-local ENEMY_PROJECTILE_TIMERS = {}
+    ENEMY_COUNT = 0,
+    ENEMY_DATA = {},
+    ENEMY_PROJECTILE_ENEMIES = {},
+    ENEMY_PROJECTILE_IDS = {},
+    ENEMY_PROJECTILE_INSTRS = {},
+    ENEMY_PROJECTILE_INSTR_TIMERS = {},
+    ENEMY_PROJECTILE_XS = {},
+    ENEMY_PROJECTILE_YS = {},
+    ENEMY_PROJECTILE_RADIUSES = {},
+    ENEMY_PROJECTILE_TIMERS = {},
+}
 
 
 -----------------------------
@@ -589,94 +590,94 @@ local function read_enemy_data(res)
 end
 
 local function read_old_memory()
-    OLD_DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
-    OLD_GAME_STATE = mainmemory.read_u8(0x0998)
-    OLD_SAMUS_X = read_u32_le_inv(0x7E0AF6)
-    OLD_SAMUS_Y = read_u32_le_inv(0x7E0AFA)
-    OLD_SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
+    M.OLD_DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
+    M.OLD_GAME_STATE = mainmemory.read_u8(0x0998)
+    M.OLD_SAMUS_X = read_u32_le_inv(0x7E0AF6)
+    M.OLD_SAMUS_Y = read_u32_le_inv(0x7E0AFA)
+    M.OLD_SAMUS_SPEED_Y = (mainmemory.read_s16_le(0x0B2E) << 16) | mainmemory.read_u16_le(0x0B2C)
 end
 
 local function read_new_memory()
-    CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
-    DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
-    ENEMY_DROP_CHANCES = ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
-    FRAME_COUNTER = mainmemory.read_u16_le(0x05B6)
-    FX_POSITION = mainmemory.read_s32_le(0x195C)
-    GAME_STATE = mainmemory.read_u8(0x0998)
-    GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
-    GRAPPLE_FUNC = mainmemory.read_u16_le(0x0D32)
-    GRAPPLE_SPEED = mainmemory.read_s16_le(0x0D26)
-    IFRAMES = mainmemory.read_u16_le(0x18A8)
-    if #INITIAL_Y_SPEED == 0 then
-        read_u16_le_array(INITIAL_Y_SPEED, 0x909EB9, 36)
+    M.CHARGE_COUNTER = mainmemory.read_u16_le(0x0CD0)
+    M.DOOR_TRANSITION_FUNC = mainmemory.read_u16_le(0x099C)
+    M.ENEMY_DROP_CHANCES = M.ENEMY_DROP_CHANCES or memory.read_bytes_as_array(0xB4F1F4, 708)
+    M.FRAME_COUNTER = mainmemory.read_u16_le(0x05B6)
+    M.FX_POSITION = mainmemory.read_s32_le(0x195C)
+    M.GAME_STATE = mainmemory.read_u8(0x0998)
+    M.GRAPPLE_ANGLE = mainmemory.read_u16_le(0x0CFA)
+    M.GRAPPLE_FUNC = mainmemory.read_u16_le(0x0D32)
+    M.GRAPPLE_SPEED = mainmemory.read_s16_le(0x0D26)
+    M.IFRAMES = mainmemory.read_u16_le(0x18A8)
+    if #M.INITIAL_Y_SPEED == 0 then
+        read_u16_le_array(M.INITIAL_Y_SPEED, 0x909EB9, 36)
     end
-    INPUT = mainmemory.read_u16_le(0x008B)
-    INPUT_HANDLER = mainmemory.read_u16_le(0x0A60)
-    ITEMS_EQUIPPED = mainmemory.read_u16_le(0x09A2)
-    KNOCKBACK = mainmemory.read_u16_le(0x18AA)
-    LAVA_POSITION = mainmemory.read_s32_le(0x1960)
-    MUSIC_TIMER = mainmemory.read_u16_le(0x063F)
-    POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
-    POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
-    POWERBOMB_X, POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
-    RANDOM = mainmemory.read_u16_le(0x05E5)
-    ROOM_PTR = mainmemory.read_u16_le(0x079B)
-    ROOM_WIDTH = mainmemory.read_u8(0x07A5)
-    SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
-    SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
-    SAMUS_HEALTH, SAMUS_HEALTH_MAX = read_bi_u16_le(0x7E09C2)
-    SAMUS_HEALTH_BOMB = mainmemory.read_u16_le(0x0E1A)
-    SAMUS_HEALTH_RESERVE_MAX, SAMUS_HEALTH_RESERVE = read_bi_u16_le(0x7E09D4)
-    SAMUS_DASH = read_u32_le_inv(0x7E0B42)
-    SAMUS_MISSILES, SAMUS_MISSILES_MAX = read_bi_u16_le(0x7E09C6)
-    SAMUS_POSE = mainmemory.read_u8(0x0A1C)
-    SAMUS_POWERBOMBS, SAMUS_POWERBOMBS_MAX = read_bi_u16_le(0x7E09CE)
-    SAMUS_RADIUS_X, SAMUS_RADIUS_Y = read_bi_u16_le(0x7E0AFE)
-    SAMUS_SPEED_CAP_Y = SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
-    SAMUS_SPEED_X = read_u32_le_inv(0x7E0B46)
-    SAMUS_SPEED_Y = mainmemory.read_s32_le(0x0B2C)
-    SAMUS_SUPERS, SAMUS_SUPERS_MAX = read_bi_u16_le(0x7E08CA)
-    SAMUS_X = read_u32_le_inv(0x7E0AF6)
-    SAMUS_Y = read_u32_le_inv(0x7E0AFA)
-    SAMUS_Y_ACCEL_AIR = SAMUS_Y_ACCEL_AIR or (memory.read_u16_le(0x909EA7) << 16) | memory.read_u16_le(0x909EA1)
-    SAMUS_Y_ACCEL_LAVA = SAMUS_Y_ACCEL_LAVA or (memory.read_u16_le(0x909EAB) << 16) | memory.read_u16_le(0x909EA5)
-    SAMUS_Y_ACCEL_WATER = SAMUS_Y_ACCEL_WATER or (memory.read_u16_le(0x909EA9) << 16) | memory.read_u16_le(0x909EA3)
-    SCREEN_X = mainmemory.read_u16_le(0x0911)
-    SCREEN_Y = mainmemory.read_u16_le(0x0915)
-    SPEED_LEVEL = mainmemory.read_u16_le(0x0B3F)
-    SPARK_TIMER = mainmemory.read_u16_le(0x0A68)
-    WEAPON_COOLDOWN = mainmemory.read_u16_le(0x0CCC)
+    M.INPUT = mainmemory.read_u16_le(0x008B)
+    M.INPUT_HANDLER = mainmemory.read_u16_le(0x0A60)
+    M.ITEMS_EQUIPPED = mainmemory.read_u16_le(0x09A2)
+    M.KNOCKBACK = mainmemory.read_u16_le(0x18AA)
+    M.LAVA_POSITION = mainmemory.read_s32_le(0x1960)
+    M.MUSIC_TIMER = mainmemory.read_u16_le(0x063F)
+    M.POWERBOMB_RADIUS = mainmemory.read_u16_le(0x0CEA)
+    M.POWERBOMB_TIMER = mainmemory.read_u16_le(0x0CEE)
+    M.POWERBOMB_X, M.POWERBOMB_Y = read_bi_u16_le(0x7E0CE2)
+    M.RANDOM = mainmemory.read_u16_le(0x05E5)
+    M.ROOM_PTR = mainmemory.read_u16_le(0x079B)
+    M.ROOM_WIDTH = mainmemory.read_u8(0x07A5)
+    M.SAMUS_DIRECTION_X = mainmemory.read_u8(0x0A1E)
+    M.SAMUS_DIRECTION_Y = mainmemory.read_u8(0x0B36)
+    M.SAMUS_HEALTH, M.SAMUS_HEALTH_MAX = read_bi_u16_le(0x7E09C2)
+    M.SAMUS_HEALTH_BOMB = mainmemory.read_u16_le(0x0E1A)
+    M.SAMUS_HEALTH_RESERVE_MAX, M.SAMUS_HEALTH_RESERVE = read_bi_u16_le(0x7E09D4)
+    M.SAMUS_DASH = read_u32_le_inv(0x7E0B42)
+    M.SAMUS_MISSILES, M.SAMUS_MISSILES_MAX = read_bi_u16_le(0x7E09C6)
+    M.SAMUS_POSE = mainmemory.read_u8(0x0A1C)
+    M.SAMUS_POWERBOMBS, M.SAMUS_POWERBOMBS_MAX = read_bi_u16_le(0x7E09CE)
+    M.SAMUS_RADIUS_X, M.SAMUS_RADIUS_Y = read_bi_u16_le(0x7E0AFE)
+    M.SAMUS_SPEED_CAP_Y = M.SAMUS_SPEED_CAP_Y or memory.read_u16_le(0x909110)
+    M.SAMUS_SPEED_X = read_u32_le_inv(0x7E0B46)
+    M.SAMUS_SPEED_Y = mainmemory.read_s32_le(0x0B2C)
+    M.SAMUS_SUPERS, M.SAMUS_SUPERS_MAX = read_bi_u16_le(0x7E08CA)
+    M.SAMUS_X = read_u32_le_inv(0x7E0AF6)
+    M.SAMUS_Y = read_u32_le_inv(0x7E0AFA)
+    M.SAMUS_Y_ACCEL_AIR = M.SAMUS_Y_ACCEL_AIR or (memory.read_u16_le(0x909EA7) << 16) | memory.read_u16_le(0x909EA1)
+    M.SAMUS_Y_ACCEL_LAVA = M.SAMUS_Y_ACCEL_LAVA or (memory.read_u16_le(0x909EAB) << 16) | memory.read_u16_le(0x909EA5)
+    M.SAMUS_Y_ACCEL_WATER = M.SAMUS_Y_ACCEL_WATER or (memory.read_u16_le(0x909EA9) << 16) | memory.read_u16_le(0x909EA3)
+    M.SCREEN_X = mainmemory.read_u16_le(0x0911)
+    M.SCREEN_Y = mainmemory.read_u16_le(0x0915)
+    M.SPEED_LEVEL = mainmemory.read_u16_le(0x0B3F)
+    M.SPARK_TIMER = mainmemory.read_u16_le(0x0A68)
+    M.WEAPON_COOLDOWN = mainmemory.read_u16_le(0x0CCC)
 
-    read_u16_le_array(PROJECTILES_X, 0x7E0B64, 10)
-    read_u16_le_array(PROJECTILES_Y, 0x7E0B78, 10)
-    read_u16_le_array(PROJECTILES_RADIUS_X, 0x7E0BB4, 10)
-    read_u16_le_array(PROJECTILES_RADIUS_Y, 0x7E0BC8, 10)
-    read_s16_le_array(PROJECTILES_VX, 0x7E0BDC, 10)
-    read_s16_le_array(PROJECTILES_VY, 0x7E0BF0, 10)
-    read_u16_le_array(BOMB_TIMERS, 0x7E0C7C, 10)
+    read_u16_le_array(M.PROJECTILES_X, 0x7E0B64, 10)
+    read_u16_le_array(M.PROJECTILES_Y, 0x7E0B78, 10)
+    read_u16_le_array(M.PROJECTILES_RADIUS_X, 0x7E0BB4, 10)
+    read_u16_le_array(M.PROJECTILES_RADIUS_Y, 0x7E0BC8, 10)
+    read_s16_le_array(M.PROJECTILES_VX, 0x7E0BDC, 10)
+    read_s16_le_array(M.PROJECTILES_VY, 0x7E0BF0, 10)
+    read_u16_le_array(M.BOMB_TIMERS, 0x7E0C7C, 10)
 
     ENEMY_COUNT = mainmemory.read_u8(0x0E4E)
-    read_enemy_data(ENEMY_DATA)
+    read_enemy_data(M.ENEMY_DATA)
 
-    read_u16_le_array(ENEMY_PROJECTILE_ENEMIES, 0x7EF3C8, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_IDS, 0x7E1997, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_INSTRS, 0x7E1B47, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_INSTR_TIMERS, 0x7E1B8F, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_XS, 0x7E1A4B, 18)
-    read_u16_le_array(ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
-    ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
-    read_u16_le_array(ENEMY_PROJECTILE_TIMERS, 0x7E19DF, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_ENEMIES, 0x7EF3C8, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_IDS, 0x7E1997, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_INSTRS, 0x7E1B47, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_INSTR_TIMERS, 0x7E1B8F, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_XS, 0x7E1A4B, 18)
+    read_u16_le_array(M.ENEMY_PROJECTILE_YS, 0x7E1A93, 18)
+    M.ENEMY_PROJECTILE_RADIUSES = mainmemory.read_bytes_as_array(0x1BB3, 36)
+    read_u16_le_array(M.ENEMY_PROJECTILE_TIMERS, 0x7E19DF, 18)
 
-    ARCADE_POINTS = memory.read_u16_le(0x7FFFA0)
-    ARCADE_TIMER = memory.read_u16_le(0x7FFFEA)
+    M.ARCADE_POINTS = memory.read_u16_le(0x7FFFA0)
+    M.ARCADE_TIMER = memory.read_u16_le(0x7FFFEA)
 
     CENTER_SAMUS = FORCE_CENTER_SAMUS
     if CENTER_SAMUS == nil then
-        if GAME_STATE == 0x08 then
-            local samus_x_px = SAMUS_X >> 16
-            local samus_y_px = SAMUS_Y >> 16
-            CENTER_SAMUS = (samus_x_px < SCREEN_X) or (SCREEN_X + 256 < samus_x_px) or
-                (samus_y_px < SCREEN_Y) or (SCREEN_Y + 224 < samus_y_px)
+        if M.GAME_STATE == 0x08 then
+            local samus_x_px = M.SAMUS_X >> 16
+            local samus_y_px = M.SAMUS_Y >> 16
+            CENTER_SAMUS = (samus_x_px < M.SCREEN_X) or (M.SCREEN_X + 256 < samus_x_px) or
+                (samus_y_px < M.SCREEN_Y) or (M.SCREEN_Y + 224 < samus_y_px)
         else
             -- don't center on room transitions
             CENTER_SAMUS = false
@@ -684,14 +685,14 @@ local function read_new_memory()
     end
 
     if CENTER_SAMUS then
-        OFFSET_X = (SAMUS_X >> 16) - 128 - PADDING_X
-        OFFSET_Y = (SAMUS_Y >> 16) - 112 - PADDING_Y
+        OFFSET_X = (M.SAMUS_X >> 16) - 128 - PADDING_X
+        OFFSET_Y = (M.SAMUS_Y >> 16) - 112 - PADDING_Y
     else
-        OFFSET_X = SCREEN_X - PADDING_X
-        OFFSET_Y = SCREEN_Y - PADDING_Y
+        OFFSET_X = M.SCREEN_X - PADDING_X
+        OFFSET_Y = M.SCREEN_Y - PADDING_Y + 8
     end
-    SAMUS_DX = math.abs(SAMUS_X - OLD_SAMUS_X)
-    SAMUS_DY = math.abs(SAMUS_Y - OLD_SAMUS_Y)
+    SAMUS_DX = math.abs(M.SAMUS_X - M.OLD_SAMUS_X)
+    SAMUS_DY = math.abs(M.SAMUS_Y - M.OLD_SAMUS_Y)
 end
 
 local function update_frame_no()
@@ -701,9 +702,9 @@ local function update_frame_no()
 end
 
 local function enable_draw()
-    return (0x08 <= GAME_STATE and GAME_STATE <= 0x14) or -- gameplay, room transitions, pause menu and start of death animation
-        GAME_STATE == 0x2A or                             -- demo
-        GAME_STATE == 0x1B                                -- reserves auto refill
+    return (0x08 <= M.GAME_STATE and M.GAME_STATE <= 0x14) or -- gameplay, room transitions, pause menu and start of death animation
+        M.GAME_STATE == 0x2A or                               -- demo
+        M.GAME_STATE == 0x1B                                  -- reserves auto refill
 end
 
 local function next_random(prev)
@@ -714,13 +715,13 @@ end
 
 -- 0=air, 1=water, 2=lava/acid
 local function liquid_physics(bottom_y, fx_position, lava_position)
-    if ITEMS_EQUIPPED & ITEM_GRAVITY ~= 0 then
+    if M.ITEMS_EQUIPPED & ITEM_GRAVITY ~= 0 then
         return 0
     end
 
-    bottom_y = bottom_y and (bottom_y >> 16) or (SAMUS_Y >> 16) + SAMUS_RADIUS_Y
-    fx_position = fx_position or FX_POSITION
-    lava_position = lava_position or LAVA_POSITION
+    bottom_y = bottom_y and (bottom_y >> 16) or (M.SAMUS_Y >> 16) + M.SAMUS_RADIUS_Y
+    fx_position = fx_position or M.FX_POSITION
+    lava_position = lava_position or M.LAVA_POSITION
 
     if fx_position >= 0 and bottom_y > (fx_position >> 16) then
         return 1
@@ -732,22 +733,22 @@ local function liquid_physics(bottom_y, fx_position, lava_position)
 end
 
 local function predict_jump_speed()
-    if 0x12 < SAMUS_POSE then
+    if 0x12 < M.SAMUS_POSE then
         return nil
     end
 
     local speed_ptr = 1 + liquid_physics()
-    if ITEMS_EQUIPPED & ITEM_HIJUMP ~= 0 then
+    if M.ITEMS_EQUIPPED & ITEM_HIJUMP ~= 0 then
         speed_ptr = speed_ptr + 6
     end
     local subspeed_ptr = speed_ptr + 3
 
-    local speed = INITIAL_Y_SPEED[speed_ptr]
-    local subspeed = INITIAL_Y_SPEED[subspeed_ptr]
+    local speed = M.INITIAL_Y_SPEED[speed_ptr]
+    local subspeed = M.INITIAL_Y_SPEED[subspeed_ptr]
 
-    if ITEMS_EQUIPPED & ITEM_SPEED ~= 0 then
-        speed = speed + (SAMUS_DASH >> 17)
-        subspeed = (subspeed + (SAMUS_DASH & 0xFFFF)) & 0xFFFF
+    if M.ITEMS_EQUIPPED & ITEM_SPEED ~= 0 then
+        speed = speed + (M.SAMUS_DASH >> 17)
+        subspeed = (subspeed + (M.SAMUS_DASH & 0xFFFF)) & 0xFFFF
     end
 
     return (speed << 16) | subspeed
@@ -783,15 +784,15 @@ end
 
 local function draw_samus_hitbox()
     -- hitbox around samus
-    local x = (SAMUS_X >> 16) - OFFSET_X
-    local y = (SAMUS_Y >> 16) - OFFSET_Y
-    local x1 = x - SAMUS_RADIUS_X
-    local y1 = y - SAMUS_RADIUS_Y
-    local x2 = x + SAMUS_RADIUS_X
-    local y2 = y + SAMUS_RADIUS_Y
+    local x = (M.SAMUS_X >> 16) - OFFSET_X
+    local y = (M.SAMUS_Y >> 16) - OFFSET_Y
+    local x1 = x - M.SAMUS_RADIUS_X
+    local y1 = y - M.SAMUS_RADIUS_Y
+    local x2 = x + M.SAMUS_RADIUS_X
+    local y2 = y + M.SAMUS_RADIUS_Y
     local fg = 0xFFFFFFFF
     local bg = 0x35FFFFFF
-    if INPUT_HANDLER ~= 0xE913 then
+    if M.INPUT_HANDLER ~= 0xE913 then
         fg = 0xFF803535
         bg = 0x35803535
     end
@@ -799,10 +800,10 @@ local function draw_samus_hitbox()
 
     -- walljump lines
     -- TODO some cases of walljump check are not shown
-    local spinning_right = (SAMUS_POSE == 0x19) or (SAMUS_POSE == 0x1B) or (SAMUS_POSE == 0x81)
-    local spinning_left = (SAMUS_POSE == 0x1A) or (SAMUS_POSE == 0x1C) or (SAMUS_POSE == 0x82)
-    local pressing_right = (INPUT & BUTTON_RIGHT) ~= 0
-    local pressing_left = (INPUT & BUTTON_LEFT) ~= 0
+    local spinning_right = (M.SAMUS_POSE == 0x19) or (M.SAMUS_POSE == 0x1B) or (M.SAMUS_POSE == 0x81)
+    local spinning_left = (M.SAMUS_POSE == 0x1A) or (M.SAMUS_POSE == 0x1C) or (M.SAMUS_POSE == 0x82)
+    local pressing_right = (M.INPUT & BUTTON_RIGHT) ~= 0
+    local pressing_left = (M.INPUT & BUTTON_LEFT) ~= 0
     if (spinning_left and pressing_left) or (spinning_right and pressing_left and pressing_right) then
         gui.drawLine(x2 + 8, y1, x2 + 8, y2)
     elseif spinning_right and pressing_right then
@@ -811,15 +812,15 @@ local function draw_samus_hitbox()
 end
 
 local function draw_speed_percent()
-    if GRAPPLE_FUNC == 0xC79D or INPUT_HANDLER ~= 0xE913 then
+    if M.GRAPPLE_FUNC == 0xC79D or M.INPUT_HANDLER ~= 0xE913 then
         -- swinging with grapple or game doesnt accept inputs
         return
     end
 
-    local x = (SAMUS_X >> 16) - OFFSET_X - SAMUS_RADIUS_X
-    local y = (SAMUS_Y >> 16) - OFFSET_Y - SAMUS_RADIUS_Y
+    local x = (M.SAMUS_X >> 16) - OFFSET_X - M.SAMUS_RADIUS_X
+    local y = (M.SAMUS_Y >> 16) - OFFSET_Y - M.SAMUS_RADIUS_Y
     local textpos = client_transformPoint(x, y)
-    local expected_dx = SAMUS_SPEED_X + SAMUS_DASH -- TODO use *$0B4A and *$0A6C
+    local expected_dx = M.SAMUS_SPEED_X + M.SAMUS_DASH -- TODO use *$0B4A and *$0A6C
     local dx_ratio = SAMUS_DX / expected_dx * 100
     if dx_ratio == dx_ratio and dx_ratio ~= 100.0 then
         -- dx_ratio is not NaN
@@ -827,7 +828,7 @@ local function draw_speed_percent()
         local color = SAMUS_DX < expected_dx and HUD_COLOR_HI or HUD_COLOR_LO
         gui.text(textpos.x, textpos.y - 2 * GUI_FONT_SIZE, expected_dx_msg, color)
     end
-    local expected_dy = math.abs(OLD_SAMUS_SPEED_Y)
+    local expected_dy = math.abs(M.OLD_SAMUS_SPEED_Y)
     local dy_ratio = SAMUS_DY / expected_dy * 100
     if dy_ratio == dy_ratio and dy_ratio ~= 100.0 then
         -- dy_ratio is not NaN
@@ -839,44 +840,44 @@ end
 
 local function draw_projectile_hitboxes()
     for i = 1, 10 do
-        if PROJECTILES_RADIUS_X[i] ~= 0 or PROJECTILES_RADIUS_Y[i] ~= 0 or BOMB_TIMERS[i] ~= 0 then
-            local x = PROJECTILES_X[i] - OFFSET_X
-            local y = PROJECTILES_Y[i] - OFFSET_Y
-            local vx = PROJECTILES_VX[i]
-            local vy = PROJECTILES_VY[i]
+        if M.PROJECTILES_RADIUS_X[i] ~= 0 or M.PROJECTILES_RADIUS_Y[i] ~= 0 or M.BOMB_TIMERS[i] ~= 0 then
+            local x = M.PROJECTILES_X[i] - OFFSET_X
+            local y = M.PROJECTILES_Y[i] - OFFSET_Y
+            local vx = M.PROJECTILES_VX[i]
+            local vy = M.PROJECTILES_VY[i]
 
-            local x1 = x - PROJECTILES_RADIUS_X[i]
-            local y1 = y - PROJECTILES_RADIUS_Y[i]
-            local x2 = x + PROJECTILES_RADIUS_X[i]
-            local y2 = y + PROJECTILES_RADIUS_Y[i]
+            local x1 = x - M.PROJECTILES_RADIUS_X[i]
+            local y1 = y - M.PROJECTILES_RADIUS_Y[i]
+            local x2 = x + M.PROJECTILES_RADIUS_X[i]
+            local y2 = y + M.PROJECTILES_RADIUS_Y[i]
             gui.drawBox(x1, y1, x2, y2, 0xFFFFFFFF, 0x35FFFFFF)
 
             if vx ~= 0 or vy ~= 0 then
                 local textpos = client_transformPoint(x1, y1)
                 local text = string.format("v: %.2f;%.2f", vx / 0x100, vy / 0x100)
                 gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, text)
-            elseif BOMB_TIMERS[i] ~= 0 then
+            elseif M.BOMB_TIMERS[i] ~= 0 then
                 local textpos = client_transformPoint(x1, y1)
-                gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, BOMB_TIMERS[i])
+                gui.text(textpos.x, textpos.y - GUI_FONT_SIZE, M.BOMB_TIMERS[i])
             end
         end
     end
 end
 
 local function draw_powerbomb_hitbox()
-    if POWERBOMB_TIMER == 0 then
+    if M.POWERBOMB_TIMER == 0 then
         return
     end
 
-    local radius_x = POWERBOMB_RADIUS >> 8
+    local radius_x = M.POWERBOMB_RADIUS >> 8
     local radius_y = (radius_x * 3) // 4
-    local x1 = POWERBOMB_X - radius_x - OFFSET_X
-    local y1 = POWERBOMB_Y - radius_y - OFFSET_Y
+    local x1 = M.POWERBOMB_X - radius_x - OFFSET_X
+    local y1 = M.POWERBOMB_Y - radius_y - OFFSET_Y
     gui.drawRectangle(x1, y1, radius_x << 1, radius_y << 1, 0xFF00FFFF, 0x35F00FFF)
 end
 
 local function draw_grapple_throw_speed()
-    if GRAPPLE_FUNC ~= 0xC79D then
+    if M.GRAPPLE_FUNC ~= 0xC79D then
         -- not swinging
         return
     end
@@ -892,20 +893,20 @@ local function draw_grapple_throw_speed()
 
     -- ref: 9B:CA65
 
-    local rot_speed = math.abs(GRAPPLE_SPEED) << 1
+    local rot_speed = math.abs(M.GRAPPLE_SPEED) << 1
 
-    local sin_angle = memory.read_s16_le(0xA0B443 + ((GRAPPLE_ANGLE >> 8) << 1))
+    local sin_angle = memory.read_s16_le(0xA0B443 + ((M.GRAPPLE_ANGLE >> 8) << 1))
     local speed_y = u16_mul(rot_speed, math.abs(sin_angle))
-    local going_up = (sin_angle >= 0) ~= (GRAPPLE_SPEED >= 0)
+    local going_up = (sin_angle >= 0) ~= (M.GRAPPLE_SPEED >= 0)
 
-    local h12 = ((GRAPPLE_ANGLE >> 8) - 0x40 + 3 * (rot_speed >> 9)) & 0xFF
+    local h12 = ((M.GRAPPLE_ANGLE >> 8) - 0x40 + 3 * (rot_speed >> 9)) & 0xFF
     local sin_h12 = memory.read_s16_le(0xA0B443 + (h12 << 1))
     local speed_x = u16_mul(rot_speed, math.abs(sin_h12))
-    local going_left = SAMUS_DIRECTION_X == 4
+    local going_left = M.SAMUS_DIRECTION_X == 4
 
     local textpos = client_transformPoint(
-        (SAMUS_X >> 16) - OFFSET_X - SAMUS_RADIUS_X,
-        (SAMUS_Y >> 16) - OFFSET_Y - SAMUS_RADIUS_Y)
+        (M.SAMUS_X >> 16) - OFFSET_X - M.SAMUS_RADIUS_X,
+        (M.SAMUS_Y >> 16) - OFFSET_Y - M.SAMUS_RADIUS_Y)
 
     local horiz_dir = (going_left and "<") or ">"
     local vert_dir = (going_up and "^") or "v"
@@ -926,21 +927,21 @@ local DROP_NAMES = {
 local function predict_enemy_drop(drop_chances_idx, random)
     -- ref: 86:F106
 
-    local small_energy = ENEMY_DROP_CHANCES[drop_chances_idx]
-    local big_energy = ENEMY_DROP_CHANCES[drop_chances_idx + 1]
-    local missile = ENEMY_DROP_CHANCES[drop_chances_idx + 2]
-    local nothing = ENEMY_DROP_CHANCES[drop_chances_idx + 3]
-    local super = ENEMY_DROP_CHANCES[drop_chances_idx + 4]
-    local powerbomb = ENEMY_DROP_CHANCES[drop_chances_idx + 5]
+    local small_energy = M.ENEMY_DROP_CHANCES[drop_chances_idx]
+    local big_energy = M.ENEMY_DROP_CHANCES[drop_chances_idx + 1]
+    local missile = M.ENEMY_DROP_CHANCES[drop_chances_idx + 2]
+    local nothing = M.ENEMY_DROP_CHANCES[drop_chances_idx + 3]
+    local super = M.ENEMY_DROP_CHANCES[drop_chances_idx + 4]
+    local powerbomb = M.ENEMY_DROP_CHANCES[drop_chances_idx + 5]
 
-    random = random or RANDOM
+    random = random or M.RANDOM
     repeat
         random = next_random(random)
     until random & 0xFF ~= 0
     random = random & 0xFF
 
-    local health_bomb = (SAMUS_HEALTH + SAMUS_HEALTH_RESERVE < 30) or
-        (SAMUS_HEALTH + SAMUS_HEALTH_RESERVE < 50 and SAMUS_HEALTH_BOMB)
+    local health_bomb = (M.SAMUS_HEALTH + M.SAMUS_HEALTH_RESERVE < 30) or
+        (M.SAMUS_HEALTH + M.SAMUS_HEALTH_RESERVE < 50 and M.SAMUS_HEALTH_BOMB)
 
     local enabled_drops = 0
     local pooled_minors_chance = 0
@@ -951,19 +952,19 @@ local function predict_enemy_drop(drop_chances_idx, random)
     else
         enabled_drops = 0x08
         pooled_minors_chance = nothing
-        if SAMUS_HEALTH ~= SAMUS_HEALTH_MAX or SAMUS_HEALTH_RESERVE ~= SAMUS_HEALTH_RESERVE_MAX then
+        if M.SAMUS_HEALTH ~= M.SAMUS_HEALTH_MAX or M.SAMUS_HEALTH_RESERVE ~= M.SAMUS_HEALTH_RESERVE_MAX then
             enabled_drops = enabled_drops | 0x03
             pooled_minors_chance = pooled_minors_chance + small_energy + big_energy
         end
-        if SAMUS_MISSILES ~= SAMUS_MISSILES_MAX then
+        if M.SAMUS_MISSILES ~= M.SAMUS_MISSILES_MAX then
             enabled_drops = enabled_drops | 0x04
             pooled_minors_chance = pooled_minors_chance + missile
         end
-        if SAMUS_SUPERS ~= SAMUS_SUPERS_MAX then
+        if M.SAMUS_SUPERS ~= M.SAMUS_SUPERS_MAX then
             enabled_drops = enabled_drops | 0x10
             pooled_majors_complement = pooled_majors_complement - super
         end
-        if SAMUS_POWERBOMBS ~= SAMUS_POWERBOMBS_MAX then
+        if M.SAMUS_POWERBOMBS ~= M.SAMUS_POWERBOMBS_MAX then
             enabled_drops = enabled_drops | 0x20
             pooled_majors_complement = pooled_majors_complement - powerbomb
         end
@@ -974,7 +975,7 @@ local function predict_enemy_drop(drop_chances_idx, random)
         for i = 0, 3 do
             if enabled_drops & (1 << i) ~= 0 then
                 drop_chance_acc = drop_chance_acc +
-                    (ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_complement) // pooled_minors_chance
+                    (M.ENEMY_DROP_CHANCES[drop_chances_idx + i] * pooled_majors_complement) // pooled_minors_chance
                 if drop_chance_acc >= random then
                     return i
                 end
@@ -983,7 +984,7 @@ local function predict_enemy_drop(drop_chances_idx, random)
     end
     for i = 4, 5 do
         if enabled_drops & (1 << i) ~= 0 then
-            drop_chance_acc = drop_chance_acc + ENEMY_DROP_CHANCES[drop_chances_idx + i]
+            drop_chance_acc = drop_chance_acc + M.ENEMY_DROP_CHANCES[drop_chances_idx + i]
             if drop_chance_acc >= random then
                 return i
             end
@@ -1007,7 +1008,7 @@ end
 
 local function draw_enemy_hitboxes()
     for i = ENEMY_COUNT, 1, -1 do
-        local enemy = ENEMY_DATA[i]
+        local enemy = M.ENEMY_DATA[i]
         if enemy.id ~= 0 then
             local ex = enemy.x - OFFSET_X
             local ey = enemy.y - OFFSET_Y
@@ -1177,31 +1178,31 @@ end
 
 local function draw_enemy_projectile_hitboxes()
     for i = 18, 1, -1 do
-        local id = ENEMY_PROJECTILE_IDS[i]
+        local id = M.ENEMY_PROJECTILE_IDS[i]
         if id ~= 0 then
             local radius_i = i << 1
-            local radius_x = ENEMY_PROJECTILE_RADIUSES[radius_i - 1]
-            local radius_y = ENEMY_PROJECTILE_RADIUSES[radius_i]
-            local x1 = ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
-            local y1 = ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
+            local radius_x = M.ENEMY_PROJECTILE_RADIUSES[radius_i - 1]
+            local radius_y = M.ENEMY_PROJECTILE_RADIUSES[radius_i]
+            local x1 = M.ENEMY_PROJECTILE_XS[i] - radius_x - OFFSET_X
+            local y1 = M.ENEMY_PROJECTILE_YS[i] - radius_y - OFFSET_Y
             gui.drawRectangle(x1, y1, radius_x << 1, radius_y << 1, 0xFFFF8000, 0x35FF8000)
 
             if id == 0xF345 then
                 -- death animation
-                local instruction = ENEMY_PROJECTILE_INSTRS[i]
-                local timer = ENEMY_PROJECTILE_TIMERS[i]
+                local instruction = M.ENEMY_PROJECTILE_INSTRS[i]
+                local timer = M.ENEMY_PROJECTILE_TIMERS[i]
                 local cooldown, rng_calls = run_instruction_list(instruction, timer)
                 if cooldown and rng_calls then
                     -- death animation that hasn't become a pickup yet
-                    cooldown = cooldown + ENEMY_PROJECTILE_INSTR_TIMERS[i]
+                    cooldown = cooldown + M.ENEMY_PROJECTILE_INSTR_TIMERS[i]
 
                     -- TODO take into account other RNG interference
 
-                    local enemy_id = ENEMY_PROJECTILE_ENEMIES[i]
+                    local enemy_id = M.ENEMY_PROJECTILE_ENEMIES[i]
                     local enemy_header = get_enemy_header(enemy_id)
                     local drop_chances = enemy_header.drop_chances
                     if drop_chances then
-                        local random = RANDOM
+                        local random = M.RANDOM
                         for _ = 1, cooldown + rng_calls do
                             random = next_random(random)
                         end
@@ -1218,7 +1219,7 @@ local function draw_enemy_projectile_hitboxes()
 end
 
 local function draw_phantoon_helpers()
-    if ROOM_PTR ~= 0xCD13 or ENEMY_COUNT < 3 then
+    if M.ROOM_PTR ~= 0xCD13 or ENEMY_COUNT < 3 then
         -- not in phantoon's room, or phantoon's dead
         return
     end
@@ -1227,22 +1228,22 @@ local function draw_phantoon_helpers()
     -- pick first pattern: D596
     -- pick next pattern: D076
 
-    local ai = ENEMY_DATA[1].ai
+    local ai = M.ENEMY_DATA[1].ai
     --local ilist_ptr = ENEMY_DATA[1].ilist_ptr
     --local ilist_timer = ENEMY_DATA[1].ilist_timer
-    local hurt_timer = ENEMY_DATA[1].hurt_timer
-    local flame_counter = ENEMY_DATA[1].ai1
+    local hurt_timer = M.ENEMY_DATA[1].hurt_timer
+    local flame_counter = M.ENEMY_DATA[1].ai1
     --local p_speed = ENEMY_DATA[1].ai2 | (ENEMY_DATA[i].ai3 << 8)
     local function u16_to_s16(n)
         return (n & 0x7FFF) - (n & 0x8000)
     end
-    local fn_timer = u16_to_s16(ENEMY_DATA[1].ai5)
-    local fn_ptr = ENEMY_DATA[1].ai6
-    local eye_open_timer = ENEMY_DATA[2].ai1
+    local fn_timer = u16_to_s16(M.ENEMY_DATA[1].ai5)
+    local fn_ptr = M.ENEMY_DATA[1].ai6
+    local eye_open_timer = M.ENEMY_DATA[2].ai1
     --local swooping_triggered = ENEMY_DATA[3].ai1
-    local round_damage = ENEMY_DATA[3].ai2
+    local round_damage = M.ENEMY_DATA[3].ai2
 
-    local is_tangible = (ENEMY_DATA[1].props & 0x0400) == 0
+    local is_tangible = (M.ENEMY_DATA[1].props & 0x0400) == 0
 
     local function time_until_intro_ends()
         if fn_ptr < 0xD4A9 or 0xD596 < fn_ptr then
@@ -1294,10 +1295,10 @@ local function draw_phantoon_helpers()
     local function draw_eye_timer(x, y)
         local timer = eye_open_timer
         local t_intro = time_until_intro_ends()
-        if t_intro > 0 and GAME_STATE == 0x08 then
+        if t_intro > 0 and M.GAME_STATE == 0x08 then
             -- predict first pattern
             -- TODO accurate prediction during door transition
-            local pattern = ((FRAME_COUNTER + t_intro) >> 1) & 3
+            local pattern = ((M.FRAME_COUNTER + t_intro) >> 1) & 3
             timer = ({ 720, 60, 360, 720, 360, 60, 360, 720 })[pattern + 1]
         end
         local color
@@ -1361,14 +1362,14 @@ local _RIDLEY_STATES = {
     [0xC600] = "Dead",
 }
 local function draw_ridley_helpers()
-    if ROOM_PTR ~= 0xB32E or ENEMY_COUNT < 1 then
+    if M.ROOM_PTR ~= 0xB32E or ENEMY_COUNT < 1 then
         -- not in ridley's room, or ridley's dead
         return
     end
 
     -- ref: A6:****
 
-    local fn_ptr = ENEMY_DATA[1].ai1
+    local fn_ptr = M.ENEMY_DATA[1].ai1
 
     local function draw_fn_ptr(x, y)
         local state = _RIDLEY_STATES[fn_ptr] or "???"
@@ -1555,7 +1556,7 @@ COMPLEX_OUTLINES = {
             -- Infinite recursion, game would probably freeze if this block reacts to anything
             return TILE_COLOR_ERROR
         end
-        local extension_index = global_index + bts * ROOM_WIDTH
+        local extension_index = global_index + bts * M.ROOM_WIDTH
         local block_type = memory.read_u8(0x7F0003 + (extension_index << 1)) >> 4
         return SIMPLE_OUTLINES[block_type + 1] or
             COMPLEX_OUTLINES[block_type](extension_index, 0, nil, stack_limit - 1)
@@ -1564,12 +1565,12 @@ COMPLEX_OUTLINES = {
 
 local function draw_blocks()
     local valid_level_data =
-        (0x08 <= GAME_STATE and GAME_STATE < 0x0B) or
-        (GAME_STATE == 0x0B and (DOOR_TRANSITION_FUNC < 0xE2F7 or 0xE36E < DOOR_TRANSITION_FUNC)) or
-        (GAME_STATE == 0x0C) or
-        (GAME_STATE == 0x11) or
-        (0x12 <= GAME_STATE and GAME_STATE <= 0x14) or
-        GAME_STATE == 0x1B
+        (0x08 <= M.GAME_STATE and M.GAME_STATE < 0x0B) or
+        (M.GAME_STATE == 0x0B and (M.DOOR_TRANSITION_FUNC < 0xE2F7 or 0xE36E < M.DOOR_TRANSITION_FUNC)) or
+        (M.GAME_STATE == 0x0C) or
+        (M.GAME_STATE == 0x11) or
+        (0x12 <= M.GAME_STATE and M.GAME_STATE <= 0x14) or
+        M.GAME_STATE == 0x1B
     if not valid_level_data then
         return
     end
@@ -1592,7 +1593,7 @@ local function draw_blocks()
             -- ref: 94:95F5
             -- the game computes the block index using 8-bit multiplication, thus
             -- the "& 0xFF". ROOM_WIDTH is already read as a u8.
-            local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * ROOM_WIDTH + (offset_x & 0xFFF)
+            local index_offset = ((OFFSET_Y // 16 + y) & 0xFF) * M.ROOM_WIDTH + (offset_x & 0xFFF)
 
             -- data accesses wrap accross bank boundaries
             local line_data = read_bytes_as_array(0x7F0000 | ((0x0002 + (index_offset << 1)) & 0xFFFF), length << 1)
@@ -1636,15 +1637,15 @@ local function draw_blocks()
 end
 
 local function draw_slopekiller_line()
-    if SAMUS_POSE ~= 0x31 and
-        SAMUS_POSE ~= 0x32 and
-        (SAMUS_POSE < 0x7D or 0x80 < SAMUS_POSE)
+    if M.SAMUS_POSE ~= 0x31 and
+        M.SAMUS_POSE ~= 0x32 and
+        (M.SAMUS_POSE < 0x7D or 0x80 < M.SAMUS_POSE)
     then
         -- not morphed or on ground
         return
     end
 
-    if SAMUS_DIRECTION_Y == 1 then
+    if M.SAMUS_DIRECTION_Y == 1 then
         -- TODO make it work when going upwards
         return
     end
@@ -1654,7 +1655,7 @@ local function draw_slopekiller_line()
     -- TODO handle horizontal movement: 90:8EA9
 
     -- Up press lag: samus falls at full speed for one frame
-    local y = SAMUS_Y + math.abs(SAMUS_SPEED_Y)
+    local y = M.SAMUS_Y + math.abs(M.SAMUS_SPEED_Y)
 
     -- crouching/unmorphing pose radius (ref: 91:B629)
     y = y + 0x100000
@@ -1662,22 +1663,22 @@ local function draw_slopekiller_line()
     --local unmorph_length = 4 -- for PAL
     local unmorph_length = 6
     local lp = liquid_physics()
-    local accel_y = SAMUS_Y_ACCEL_AIR
+    local accel_y = M.SAMUS_Y_ACCEL_AIR
     if lp == 1 then
         unmorph_length = 12
-        accel_y = SAMUS_Y_ACCEL_WATER
+        accel_y = M.SAMUS_Y_ACCEL_WATER
     elseif lp == 2 then
         unmorph_length = 12
-        accel_y = SAMUS_Y_ACCEL_LAVA
+        accel_y = M.SAMUS_Y_ACCEL_LAVA
     end
     local in_air = lp == 0
-    local fx_position = FX_POSITION
-    local lava_position = LAVA_POSITION
+    local fx_position = M.FX_POSITION
+    local lava_position = M.LAVA_POSITION
 
     local speed_y
-    if SAMUS_SPEED_Y >= 0 then
-        speed_y = SAMUS_SPEED_Y
-        if SAMUS_SPEED_Y >> 16 ~= SAMUS_SPEED_CAP_Y then
+    if M.SAMUS_SPEED_Y >= 0 then
+        speed_y = M.SAMUS_SPEED_Y
+        if M.SAMUS_SPEED_Y >> 16 ~= M.SAMUS_SPEED_CAP_Y then
             speed_y = speed_y + accel_y
         end
     else
@@ -1687,7 +1688,7 @@ local function draw_slopekiller_line()
     while unmorph_length > 0 do
         -- TODO 90:A16C  94:86FE
         y = y + speed_y
-        if SAMUS_SPEED_Y >= 0 and speed_y >> 16 ~= SAMUS_SPEED_CAP_Y then
+        if M.SAMUS_SPEED_Y >= 0 and speed_y >> 16 ~= M.SAMUS_SPEED_CAP_Y then
             speed_y = speed_y + accel_y
         end
         unmorph_length = unmorph_length - 1
@@ -1697,11 +1698,11 @@ local function draw_slopekiller_line()
             if lp == 1 then
                 in_air = false
                 unmorph_length = unmorph_length << 1
-                accel_y = SAMUS_Y_ACCEL_WATER
+                accel_y = M.SAMUS_Y_ACCEL_WATER
             elseif lp == 2 then
                 in_air = false
                 unmorph_length = unmorph_length << 1
-                accel_y = SAMUS_Y_ACCEL_LAVA
+                accel_y = M.SAMUS_Y_ACCEL_LAVA
             end
         end
     end
@@ -1728,12 +1729,12 @@ local function draw_door_lag()
         _dlag_scroll = 0
     end
 
-    if not (0x09 <= GAME_STATE and GAME_STATE <= 0x0B) then
+    if not (0x09 <= M.GAME_STATE and M.GAME_STATE <= 0x0B) then
         -- not in a door transition
         return
     end
 
-    if not SEEKED and OLD_GAME_STATE == 0x08 then
+    if not SEEKED and M.OLD_GAME_STATE == 0x08 then
         _dlag_seen_transition_start = true
         _dlag_seen_transition_end = false
         _dlag_sound = 0
@@ -1741,16 +1742,16 @@ local function draw_door_lag()
         _dlag_scroll = 0
     end
 
-    if DOOR_TRANSITION_FUNC == OLD_DOOR_TRANSITION_FUNC then
-        if DOOR_TRANSITION_FUNC == 0xE29E then
+    if M.DOOR_TRANSITION_FUNC == M.OLD_DOOR_TRANSITION_FUNC then
+        if M.DOOR_TRANSITION_FUNC == 0xE29E then
             _dlag_sound = _dlag_sound + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE2DB then
+        elseif M.DOOR_TRANSITION_FUNC == 0xE2DB then
             _dlag_fade_out = _dlag_fade_out + 1
-        elseif DOOR_TRANSITION_FUNC == 0xE310 or DOOR_TRANSITION_FUNC == 0xE353 then
+        elseif M.DOOR_TRANSITION_FUNC == 0xE310 or M.DOOR_TRANSITION_FUNC == 0xE353 then
             _dlag_scroll = _dlag_scroll + 1
         end
     end
-    if DOOR_TRANSITION_FUNC == 0xE36E then
+    if M.DOOR_TRANSITION_FUNC == 0xE36E then
         _dlag_seen_transition_end = true
     end
 
@@ -1789,46 +1790,46 @@ end
 local function mark_door_transitions_as_lag()
     -- make it work even when read_new_memory hasn't been called
     local game_state = mainmemory.read_u8(0x0998)
-    if OLD_GAME_STATE == 0x0B or game_state == 0x0B then
+    if M.OLD_GAME_STATE == 0x0B or game_state == 0x0B then
         tastudio.setlag(FRAME_NO, true)
     end
 end
 
 local function draw_hud()
     local function draw_samus_x(x, y)
-        local text = string.format("x:%7d.%05d", SAMUS_X >> 16, SAMUS_X & 0xFFFF)
+        local text = string.format("x:%7d.%05d", M.SAMUS_X >> 16, M.SAMUS_X & 0xFFFF)
         gui.text(x, y, text)
     end
 
     local function draw_samus_y(x, y)
-        local text = string.format("y:%7d.%05d", SAMUS_Y >> 16, SAMUS_Y & 0xFFFF)
+        local text = string.format("y:%7d.%05d", M.SAMUS_Y >> 16, M.SAMUS_Y & 0xFFFF)
         gui.text(x, y, text)
     end
 
     local function draw_screen_x(x, y)
-        local text = string.format("sx:%12d", SCREEN_X)
+        local text = string.format("sx:%12d", M.SCREEN_X)
         gui.text(x, y, text)
     end
 
     local function draw_screen_y(x, y)
-        local text = string.format("sy:%12d", SCREEN_Y)
+        local text = string.format("sy:%12d", M.SCREEN_Y)
         gui.text(x, y, text)
     end
 
     local function draw_samus_speed_x(x, y)
         local format
-        if SAMUS_DIRECTION_X == 0 then
+        if M.SAMUS_DIRECTION_X == 0 then
             format = "vx: |%4d.%05d"
-        elseif SAMUS_DIRECTION_X == 4 then
+        elseif M.SAMUS_DIRECTION_X == 4 then
             format = "vx: <%4d.%05d"
-        elseif SAMUS_DIRECTION_X == 8 then
+        elseif M.SAMUS_DIRECTION_X == 8 then
             format = "vx: >%4d.%05d"
         else
             format = "vx: ?%4d.%05d"
         end
-        local text = string.format(format, SAMUS_SPEED_X // 0x10000, SAMUS_SPEED_X & 0xFFFF)
+        local text = string.format(format, M.SAMUS_SPEED_X // 0x10000, M.SAMUS_SPEED_X & 0xFFFF)
         local color
-        if SAMUS_SPEED_X == 0 then
+        if M.SAMUS_SPEED_X == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1836,18 +1837,18 @@ local function draw_hud()
 
     local function draw_samus_speed_y(x, y)
         local format
-        if SAMUS_DIRECTION_Y == 0 then
+        if M.SAMUS_DIRECTION_Y == 0 then
             format = "vy: -%4d.%05d"
-        elseif SAMUS_DIRECTION_Y == 1 then
+        elseif M.SAMUS_DIRECTION_Y == 1 then
             format = "vy: ^%4d.%05d"
-        elseif SAMUS_DIRECTION_Y == 2 then
+        elseif M.SAMUS_DIRECTION_Y == 2 then
             format = "vy: v%4d.%05d"
         else
             format = "vy: ?%4d.%05d"
         end
-        local text = string.format(format, SAMUS_SPEED_Y // 0x10000, SAMUS_SPEED_Y & 0xFFFF)
+        local text = string.format(format, M.SAMUS_SPEED_Y // 0x10000, M.SAMUS_SPEED_Y & 0xFFFF)
         local color
-        if SAMUS_SPEED_Y == 0 then
+        if M.SAMUS_SPEED_Y == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1856,9 +1857,9 @@ local function draw_hud()
     local function draw_samus_dx(x, y)
         local text
         local color
-        if OLD_SAMUS_X < SAMUS_X then
+        if M.OLD_SAMUS_X < M.SAMUS_X then
             text = string.format("dx: >%4d.%05d", SAMUS_DX >> 16, SAMUS_DX & 0xFFFF)
-        elseif OLD_SAMUS_X > SAMUS_X then
+        elseif M.OLD_SAMUS_X > M.SAMUS_X then
             text = string.format("dx: <%4d.%05d", SAMUS_DX >> 16, SAMUS_DX & 0xFFFF)
         else
             text = "dx:     0.00000"
@@ -1870,9 +1871,9 @@ local function draw_hud()
     local function draw_samus_dy(x, y)
         local text
         local color
-        if OLD_SAMUS_Y < SAMUS_Y then
+        if M.OLD_SAMUS_Y < M.SAMUS_Y then
             text = string.format("dy: v%4d.%05d", SAMUS_DY >> 16, SAMUS_DY & 0xFFFF)
-        elseif OLD_SAMUS_Y > SAMUS_Y then
+        elseif M.OLD_SAMUS_Y > M.SAMUS_Y then
             text = string.format("dy: ^%4d.%05d", SAMUS_DY >> 16, SAMUS_DY & 0xFFFF)
         else
             text = "dy:     0.00000"
@@ -1882,25 +1883,25 @@ local function draw_hud()
     end
 
     local function draw_samus_dash(x, y)
-        local text = string.format("Dash:%4d.%05d", SAMUS_DASH >> 16, SAMUS_DASH & 0xFFFF)
+        local text = string.format("Dash:%4d.%05d", M.SAMUS_DASH >> 16, M.SAMUS_DASH & 0xFFFF)
         local color
-        if SAMUS_DASH == 0 then
+        if M.SAMUS_DASH == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
     end
 
     local function draw_samus_pose(x, y)
-        local pose_name = POSE_NAMES[SAMUS_POSE] or "???"
-        local text = string.format("Pose: %02Xh \"%s\"", SAMUS_POSE, pose_name)
+        local pose_name = POSE_NAMES[M.SAMUS_POSE] or "???"
+        local text = string.format("Pose: %02Xh \"%s\"", M.SAMUS_POSE, pose_name)
         gui.text(x, y, text)
     end
 
     local function draw_samus_reserves(x, y)
-        local text = string.format("Reserves:%6d", SAMUS_HEALTH_RESERVE)
+        local text = string.format("Reserves:%6d", M.SAMUS_HEALTH_RESERVE)
         local color
-        if SAMUS_HEALTH_RESERVE_MAX == 0 then
-            if SAMUS_HEALTH_RESERVE == 0 then
+        if M.SAMUS_HEALTH_RESERVE_MAX == 0 then
+            if M.SAMUS_HEALTH_RESERVE == 0 then
                 color = HUD_COLOR_LO
             else
                 color = HUD_COLOR_HI
@@ -1910,18 +1911,18 @@ local function draw_hud()
     end
 
     local function draw_beam_cooldown(x, y)
-        local text = string.format("Weapon CD:%5d", WEAPON_COOLDOWN)
+        local text = string.format("Weapon CD:%5d", M.WEAPON_COOLDOWN)
         local color
-        if WEAPON_COOLDOWN == 0 then
+        if M.WEAPON_COOLDOWN == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
     end
 
     local function draw_charge_counter(x, y)
-        local text = string.format("Charge:%8d", CHARGE_COUNTER)
+        local text = string.format("Charge:%8d", M.CHARGE_COUNTER)
         local color
-        if CHARGE_COUNTER == 0 then
+        if M.CHARGE_COUNTER == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1930,12 +1931,12 @@ local function draw_hud()
     local function draw_knockback_iframes(x, y)
         local text
         local color
-        if KNOCKBACK ~= 0 then
-            text = string.format("Knockback:%5d", KNOCKBACK)
+        if M.KNOCKBACK ~= 0 then
+            text = string.format("Knockback:%5d", M.KNOCKBACK)
             color = HUD_COLOR_HI
         else
-            text = string.format("I. frames:%5d", IFRAMES)
-            if IFRAMES == 0 then
+            text = string.format("I. frames:%5d", M.IFRAMES)
+            if M.IFRAMES == 0 then
                 color = HUD_COLOR_LO
             end
         end
@@ -1943,18 +1944,18 @@ local function draw_hud()
     end
 
     local function draw_speed_level(x, y)
-        local text = string.format("Speed lvl:%04Xh", SPEED_LEVEL)
+        local text = string.format("Speed lvl:%04Xh", M.SPEED_LEVEL)
         local color
-        if SPEED_LEVEL == 0 then
+        if M.SPEED_LEVEL == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
     end
 
     local function draw_spark_timer(x, y)
-        local text = string.format("Spark CD:%6d", SPARK_TIMER)
+        local text = string.format("Spark CD:%6d", M.SPARK_TIMER)
         local color
-        if SPARK_TIMER == 0 then
+        if M.SPARK_TIMER == 0 then
             color = HUD_COLOR_LO
         end
         gui.text(x, y, text, color)
@@ -1975,8 +1976,8 @@ local function draw_hud()
 
     local function draw_fanfare_timer(x, y)
         local fanfare_timer = 0
-        if SAMUS_POSE == 0x00 or SAMUS_POSE == 0x9B then
-            fanfare_timer = MUSIC_TIMER
+        if M.SAMUS_POSE == 0x00 or M.SAMUS_POSE == 0x9B then
+            fanfare_timer = M.MUSIC_TIMER
         end
         local text = string.format("Fanfare:%7d", fanfare_timer)
         local color
@@ -1987,17 +1988,17 @@ local function draw_hud()
     end
 
     local function draw_game_state(x, y)
-        local text = string.format("Game state: %02Xh", GAME_STATE)
+        local text = string.format("Game state: %02Xh", M.GAME_STATE)
         gui.text(x, y, text)
     end
 
     local function draw_arcade_points(x, y)
-        local text = string.format("Points:%8d", ARCADE_POINTS)
+        local text = string.format("Points:%8d", M.ARCADE_POINTS)
         gui.text(x, y, text)
     end
 
     local function draw_arcade_timer(x, y)
-        local text = string.format("Timer:%6d:%02d", ARCADE_TIMER >> 8, ARCADE_TIMER & 0xFF)
+        local text = string.format("Timer:%6d:%02d", M.ARCADE_TIMER >> 8, M.ARCADE_TIMER & 0xFF)
         gui.text(x, y, text)
     end
 
