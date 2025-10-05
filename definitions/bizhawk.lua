@@ -228,6 +228,10 @@ function mainmemory.read_s32_le(address) end
 ---@class (exact) memory
 memory = {}
 
+---@return string
+---@nodiscard
+function memory.getcurrentmemorydomain() end
+
 ---@return string[]
 ---@nodiscard
 function memory.getmemorydomainlist() end
